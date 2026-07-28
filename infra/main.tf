@@ -169,6 +169,15 @@ resource "google_cloud_run_v2_service" "irrigagent_app" {
   ]
 }
 
+# Explicitly allow unauthenticated HTTP invocations for public Meta WhatsApp webhooks
+resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.irrigagent_app.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
 # ------------------------------------------------------------------------------
 # Cloud Scheduler Job (18:45 GMT+1 Daily Trigger)
 # ------------------------------------------------------------------------------
