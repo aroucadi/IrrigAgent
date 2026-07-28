@@ -11,8 +11,8 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 ## 🌾 Core Features
 
 ### 💧 IrrigAgent (Hero Feature)
-- **Daily Weather & ET₀ Integration**: Automatically ingests daily forecast and evapotranspiration data from Open-Meteo for the farm's location (18:45 GMT+1 batch job with short-backoff retries & yesterday ET₀ fallback).
-- **Previous Evening Dispatch (19:00 GMT+1)**: Sends proactive daily recommendations the night before to match Hassan's evening WhatsApp review habits and allow calm planning before pre-06:00 AM irrigation starts.
+- **Daily Weather & ET₀ Integration**: Automatically ingests daily forecast and evapotranspiration data from Open-Meteo for the farm's location (18:45 Africa/Casablanca batch job with short-backoff retries & yesterday ET₀ fallback).
+- **Previous Evening Dispatch (19:00 Africa/Casablanca)**: Sends proactive daily recommendations the night before to match Hassan's evening WhatsApp review habits and allow calm planning before pre-06:00 AM irrigation starts.
 - **Deterministic Decision Engine**: Calculates daily irrigation adjustments using rule-based thresholds (upgradeable to lightweight LLM reasoning).
 - **One-Tap WhatsApp Interface**: Proactively sends alerts with 3 clear options:
   - `1`: Approve adjustment
@@ -32,27 +32,27 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 
 ---
 
-## 🏗️ Technical Architecture
+## 🏗️ Technical Architecture & Infrastructure as Code
 
 ```
-[ WhatsApp (Meta Cloud API — Sandbox) ] ◄──Webhook──► [ FastAPI on GCP Cloud Run ]
-                                                             │
-                                                     ┌───────┴───────┐
-                                                     ▼               ▼
-                                             [ Decision Logic ]  [ Firestore DB ]
-                                             (Rule-based logic)  (Farm profiles & logs)
-                                                     │
-                                   ┌─────────────────┴─────────────────┐
-                                   ▼                                   ▼
-                            [ Open-Meteo ]                     [ Gemini 1.5 Flash ]
-                            (Weather / ET₀)                    (Leaf Photo Triage)
+[ Meta WhatsApp Cloud API ] ◄──Webhook──► [ GCP Cloud Run v2 (FastAPI) ]
+                                                    │
+                                            ┌───────┴───────┐
+                                            ▼               ▼
+                                    [ Decision Logic ]  [ Firestore Native DB ]
+                                            │
+                           ┌────────────────┴────────────────┐
+                           ▼                                 ▼
+                   [ Open-Meteo ]                    [ Gemini 1.5 Flash ]
+                   (Weather / ET₀)                   (Leaf Photo Triage)
 ```
 
 - **Messaging**: Meta WhatsApp Cloud API (v20.0 Sandbox Mode)
 - **Backend**: Python 3.11+, FastAPI web service
 - **AI Vision**: Gemini 1.5 Flash via Vertex AI
 - **Data & Storage**: Google Cloud Firestore (Native Mode)
-- **Deployment**: GCP Cloud Run (Serverless Container)
+- **Infrastructure as Code (IaC)**: Modular Terraform HCL under `infra/` (`main.tf`, `variables.tf`, `outputs.tf`, `cloud_run.tf`, `secrets.tf`, `scheduler.tf` set to **18:45 Africa/Casablanca**)
+- **Automated CI/CD**: GitHub Actions deployment workflow ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) automating Docker build/push to GCP Artifact Registry and non-interactive `terraform apply`
 
 ---
 
@@ -66,11 +66,12 @@ This project is built following GitHub's [spec-kit](https://github.com/github/sp
   - **Mandatory ONSSA disclaimer** on all CropDoctor responses
   - **Sandbox messaging tier only** (Max 5 test numbers)
   - **Strict cut list** (No voice, no payments, no sensor hardware integration)
+  - **Infrastructure as Code (Principle VII)**: 100% of GCP cloud resources provisioned declaratively via Terraform (0 manual GCP Console edits)
 
 ### 📁 Active Feature Design Artifacts (`001-hassan-irrigation-agent`)
 - **Feature Specification**: [specs/001-hassan-irrigation-agent/spec.md](specs/001-hassan-irrigation-agent/spec.md)
 - **Architecture Implementation Plan**: [specs/001-hassan-irrigation-agent/plan.md](specs/001-hassan-irrigation-agent/plan.md)
-- **Actionable Task Breakdown (23 Tasks)**: [specs/001-hassan-irrigation-agent/tasks.md](specs/001-hassan-irrigation-agent/tasks.md)
+- **Actionable Task Breakdown (29 Tasks)**: [specs/001-hassan-irrigation-agent/tasks.md](specs/001-hassan-irrigation-agent/tasks.md)
 - **Technical Research**: [specs/001-hassan-irrigation-agent/research.md](specs/001-hassan-irrigation-agent/research.md)
 - **Data Model & ONSSA Lookup Schema**: [specs/001-hassan-irrigation-agent/data-model.md](specs/001-hassan-irrigation-agent/data-model.md)
 - **Interface Contracts**: [specs/001-hassan-irrigation-agent/contracts/](specs/001-hassan-irrigation-agent/contracts/)
@@ -78,21 +79,24 @@ This project is built following GitHub's [spec-kit](https://github.com/github/sp
 
 ---
 
-## 📋 Getting Started
+## 📋 Getting Started & Local Validation
 
 ### Prerequisites
 - Python 3.11+
+- HashiCorp Terraform 1.5+
 - Meta Developer Account (WhatsApp Cloud API App in Sandbox)
-- GCP Project with Cloud Run & Vertex AI enabled
+- GCP Project with Cloud Run, Firestore, Secret Manager, Cloud Scheduler & Vertex AI enabled
 
-### Environment Configuration
-Copy `.env.example` to `.env` and fill in the required credentials:
+### Verification Commands
 ```bash
-WHATSAPP_TOKEN=<your_meta_access_token>
-WHATSAPP_PHONE_NUMBER_ID=<your_sandbox_phone_number_id>
-VERIFY_TOKEN=<your_webhook_verification_token>
-GCP_PROJECT_ID=<your_gcp_project_id>
-JOB_SECRET_TOKEN=<your_batch_job_secret>
+# Run unit & integration test suite
+pytest
+
+# Validate Terraform IaC module syntax
+terraform -chdir=infra validate
+
+# Dry-run Terraform execution plan
+terraform -chdir=infra plan -var="project_id=your-gcp-project-id"
 ```
 
 ---
