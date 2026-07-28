@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HealthCheckResponse",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string" },
+    "app": { "type": "string" },
+    "version": { "type": "string" },
+    "voice_teaser_enabled": { "type": "boolean" }
+  },
+  "required": ["status", "app", "version", "voice_teaser_enabled"]
+}

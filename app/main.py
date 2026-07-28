@@ -20,6 +20,13 @@ from app.firestore_client import (
     parse_profile_command,
 )
 
+from app.schemas import (
+    HealthCheckResponse,
+    FarmProfile,
+    DailyAdvisoryJobResponse,
+    WebhookVerification,
+)
+
 app = FastAPI(title="IrrigAgent AI", version="1.0.0")
 
 
@@ -36,25 +43,29 @@ async def dispatch_darija_voice_teaser(phone: str, text_intent: str):
         pass
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthCheckResponse)
 async def health_check():
-    return {
-        "status": "ok",
-        "app": "IrrigAgent AI",
-        "version": "1.0.0",
-        "voice_teaser_enabled": ENABLE_DARIJA_VOICE_TEASER,
-    }
+    return HealthCheckResponse(
+        status="ok",
+        app="IrrigAgent AI",
+        version="1.0.0",
+        voice_teaser_enabled=ENABLE_DARIJA_VOICE_TEASER,
+    )
 
 
 @app.get("/webhook")
 async def verify_webhook(
-    hub_mode: str = Query(None, alias="hub.mode"),
-    hub_verify_token: str = Query(None, alias="hub.verify_token"),
-    hub_challenge: str = Query(None, alias="hub.challenge"),
+    hub_mode: Optional[str] = Query(None, alias="hub.mode"),
+    hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
+    hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
 ):
     """Meta webhook verification handshake endpoint."""
-    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return Response(content=hub_challenge, media_type="text/plain")
+    if hub_mode and hub_verify_token and hub_challenge:
+        verification = WebhookVerification(
+            **{"hub.mode": hub_mode, "hub.verify_token": hub_verify_token, "hub.challenge": hub_challenge}
+        )
+        if verification.hub_mode == "subscribe" and verification.hub_verify_token == VERIFY_TOKEN:
+            return Response(content=verification.hub_challenge, media_type="text/plain")
     return Response(content="Forbidden", status_code=403)
 
 
@@ -206,8 +217,8 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "reminder_sent"}
 
 
-@app.post("/jobs/daily-recommendations")
-@app.post("/api/v1/jobs/daily-advisory")
+@app.post("/jobs/daily-recommendations", response_model=DailyAdvisoryJobResponse)
+@app.post("/api/v1/jobs/daily-advisory", response_model=DailyAdvisoryJobResponse)
 async def trigger_daily_recommendations(
     background_tasks: BackgroundTasks,
     authorization: Optional[str] = Header(None)
@@ -262,10 +273,10 @@ async def trigger_daily_recommendations(
         except Exception:
             failed_count += 1
 
-    return {
-        "status": "success",
-        "dispatched_count": dispatched_count,
-        "failed_count": failed_count,
-        "data_quality_summary": quality_summary,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    return DailyAdvisoryJobResponse(
+        status="success",
+        processed_count=dispatched_count,
+        skipped_count=failed_count,
+        dispatched_count=dispatched_count,
+        failed_count=failed_count,
+    )

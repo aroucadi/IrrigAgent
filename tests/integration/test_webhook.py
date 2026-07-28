@@ -197,3 +197,37 @@ def test_daily_batch_job_authorization():
             assert data.get("status") == "success"
             assert "dispatched_count" in data
     asyncio.run(_test())
+
+
+def test_health_endpoint():
+    """Verify GET /health returns HTTP 200 matching HealthCheckResponse schema structure."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get("/health")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data.get("status") == "ok"
+            assert data.get("app") == "IrrigAgent AI"
+            assert "version" in data
+            assert "voice_teaser_enabled" in data
+    asyncio.run(_test())
+
+
+def test_daily_advisory_alias_endpoint():
+    """Verify POST /api/v1/jobs/daily-advisory returns identical status & auth behavior as /jobs/daily-recommendations."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            # Unauthorized call check
+            unauth_resp = await client.post("/api/v1/jobs/daily-advisory")
+            assert unauth_resp.status_code == 401
+
+            # Authorized call check
+            headers = {"Authorization": f"Bearer {JOB_SECRET_TOKEN}"}
+            resp = await client.post("/api/v1/jobs/daily-advisory", headers=headers)
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data.get("status") == "success"
+            assert "processed_count" in data
+            assert "skipped_count" in data
+    asyncio.run(_test())
+
