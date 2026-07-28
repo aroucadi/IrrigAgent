@@ -72,7 +72,7 @@ curl -X POST "http://localhost:8080/webhook" \
 ---
 
 ### Scenario 3: Trigger Daily Proactive Recommendation Batch (`POST /jobs/daily-recommendations`)
-Simulate the 18:45 GMT+1 Cloud Scheduler batch run.
+Simulate the 18:45 Africa/Casablanca Cloud Scheduler batch run.
 
 ```bash
 curl -X POST "http://localhost:8080/jobs/daily-recommendations" \
@@ -92,18 +92,14 @@ Verify that EVERY CropDoctor triage output includes the mandatory ONSSA disclaim
 
 ---
 
-### Scenario 5: Terraform GCP Infrastructure Validation (`infra/`)
-Verify declarative Infrastructure as Code provisioned without manual GCP Console clicks per Constitution Principle VII.
+### Scenario 5: GCP Cloud Run Deployment (`gcloud CLI`)
+Verify application container deployment via Google Cloud SDK CLI per PRD Section 15.11.
 
 ```bash
-# 1. Initialize Terraform GCP provider
-terraform -chdir=infra init
-
-# 2. Validate configuration syntax
-terraform -chdir=infra validate
-
-# 3. Perform dry-run plan against GCP sandbox project
-terraform -chdir=infra plan -var="project_id=irrigagent-dev" -var="whatsapp_access_token=test" -var="whatsapp_verify_token=test" -var="cron_secret=test"
+gcloud run deploy irrigagent \
+  --source . \
+  --region europe-west1 \
+  --allow-unauthenticated \
+  --set-env-vars WHATSAPP_TOKEN=...,WHATSAPP_PHONE_NUMBER_ID=...,VERIFY_TOKEN=...,GCP_PROJECT_ID=...,JOB_SECRET_TOKEN=...
 ```
-**Expected Outcome**: Terraform outputs execution plan detailing creation of `google_cloud_run_v2_service`, `google_firestore_database`, `google_cloud_scheduler_job`, `google_secret_manager_secret`, and `google_service_account` resources with 0 errors.
-
+**Expected Outcome**: Cloud Run service deploys successfully and provides public HTTPS callback URL for Meta WhatsApp Cloud API webhooks (`https://<service-url>/webhook`). *(Note: Declarative Terraform IaC migration will occur post-selection under Milestone M6).*
