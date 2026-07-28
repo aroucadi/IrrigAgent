@@ -6,7 +6,7 @@
 ## Format: `[ID] [P?] [Story?] Description with file path`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Maps to user story from spec.md ([US1], [US2], [US3])
+- **[Story]**: Maps to user story from spec.md ([US1], [US2], [US3], [US4])
 - Includes exact file paths in descriptions
 
 ---
@@ -73,17 +73,31 @@
 - [x] T019 [US3] Implement dual-language onboarding initial greeting and profile registration handler in `app/main.py` (depends on T018)
 - [x] T020 [P] [US3] Integration test for webhook endpoints & onboarding flows in `tests/integration/test_webhook.py`
 
-**Checkpoint**: All user stories independently functional
+**Checkpoint**: All application user stories independently functional
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 - Automated Infrastructure-as-Code Provisioning (Priority: P2) 🏗️ IaC
+
+**Goal**: Declarative Infrastructure as Code for GCP cloud resources (`infra/` module using Terraform HCL) per Constitution Principle VII.  
+**Independent Test**: Execute `terraform -chdir=infra init`, `validate`, and `plan` dry-run against a GCP project, verifying Cloud Run, Firestore Native, Cloud Scheduler 18:45 GMT+1, Secret Manager, and IAM service accounts with 0 errors.
+
+- [ ] T021 [P] [US4] Implement Terraform input variables (`project_id`, `region`, `container_image`, secrets) in `infra/variables.tf`
+- [ ] T022 [P] [US4] Implement Terraform GCP resources (`google_cloud_run_v2_service`, `google_firestore_database`, `google_cloud_scheduler_job`, `google_secret_manager_secret`, `google_service_account`, `google_project_iam_member`) in `infra/main.tf`
+- [ ] T023 [P] [US4] Implement Terraform outputs (`cloud_run_url`, service account emails, database name) in `infra/outputs.tf`
+- [ ] T024 [US4] Validate Terraform IaC module via `terraform -chdir=infra validate` and `terraform -chdir=infra plan` per `contracts/infra-contract.md` (depends on T021, T022, T023)
+
+**Checkpoint**: Infrastructure-as-Code module fully specified, syntactically valid, and testable independently
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: Production deployment readiness and runnable validation scenarios
 
-- [x] T021 [P] Create Dockerfile for GCP Cloud Run deployment in `Dockerfile`
-- [x] T022 Run quickstart validation scenario suite against local running app per `quickstart.md`
-- [x] T023 [P] Final documentation review and code cleanup across `app/` and `README.md`
+- [x] T025 [P] Create Dockerfile for GCP Cloud Run deployment in `Dockerfile`
+- [ ] T026 Run quickstart validation scenario suite against local app & Terraform module per `quickstart.md`
+- [x] T027 [P] Final documentation review and code cleanup across `app/`, `infra/`, and `README.md`
 
 ---
 
@@ -95,9 +109,11 @@ graph TD
     Phase2 --> US1[Phase 3: US1 - IrrigAgent MVP]
     Phase2 --> US2[Phase 4: US2 - CropDoctor]
     Phase2 --> US3[Phase 5: US3 - Profile & Onboarding]
-    US1 --> Polish[Phase 6: Polish & Validation]
+    Phase2 --> US4[Phase 6: US4 - Infrastructure as Code]
+    US1 --> Polish[Phase 7: Polish & Validation]
     US2 --> Polish
     US3 --> Polish
+    US4 --> Polish
 ```
 
 ---
@@ -110,4 +126,4 @@ graph TD
 3. **STOP and VALIDATE**: Test User Story 1 end-to-end via `POST /webhook` and `POST /jobs/daily-recommendations`.
 
 ### Incremental Delivery
-1. Foundation -> 2. IrrigAgent MVP -> 3. CropDoctor Module -> 4. Zero-Friction Onboarding -> 5. Cloud Run Deploy.
+1. Foundation -> 2. IrrigAgent MVP -> 3. CropDoctor Module -> 4. Zero-Friction Onboarding -> 5. Infrastructure as Code (`infra/`) -> 6. Cloud Run Deploy.
