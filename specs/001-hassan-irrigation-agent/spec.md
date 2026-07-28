@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-28
 
-**Status**: Draft
+**Status**: Complete
 
 **Input**: User description: "Read PRD.md and draft our formal spec artifact for the Hassan persona (proactive irrigation agent + light photo triage)."
 
@@ -76,7 +76,7 @@ As Hassan, I want to register and update my basic farm profile (location/coordin
 - **Weather API Failure / Fallback**: If Open-Meteo API calls fail during the 18:45 GMT+1 batch run, the system retries 3 times with short backoff (10s/30s/60s). If still failing, it uses yesterday's ET₀ baseline and appends an explicit "Estimated data" notice to the 19:00 GMT+1 WhatsApp advisory message.
 - **Unrecognized User Reply**: If Hassan replies with text other than `1`, `2`, `3`, or a valid profile command, the system gently reminds Hassan of the available reply options.
 - **Extreme Weather Events**: If heavy rainfall is forecasted for the next day (>= 15mm), the recommendation engine automatically defaults to recommending "Skip irrigation" (Reply 2).
-- **Non-Standard Photo Content**: If a submitted photo contains multiple leaves or low lighting, the diagnosis includes a lower confidence score, omits product recommendations, and requests a clearer single-leaf photo.
+- **Non-Standard Photo Content**: If a submitted photo contains multiple leaves or low lighting, the diagnosis automatically falls into the Low confidence (<50%) tier, omitting chemical product recommendations entirely and requesting a clearer single-leaf close-up photo per FR-016.
 
 ## Requirements *(mandatory)*
 
@@ -110,9 +110,9 @@ As Hassan, I want to register and update my basic farm profile (location/coordin
 ### Measurable Outcomes
 
 - **SC-001**: **100% End-to-End Delivery**: Proactive irrigation recommendations are successfully delivered to verified WhatsApp sandbox recipient numbers every evening at 19:00 GMT+1.
-- **SC-002**: **Rapid Decision Time**: Farmers can approve, skip, or modify an irrigation decision in under 15 seconds via WhatsApp one-tap reply.
+- **SC-002**: **Rapid Decision Time**: Farmers can approve, skip, or modify an irrigation decision in under 15 seconds via WhatsApp one-tap reply (Pilot User Feedback KPI; software performance SLA is <2s webhook response).
 - **SC-003**: **100% Regulatory Compliance**: 100% of CropDoctor diagnostic replies include the verbatim ONSSA disclaimer, and 0% of Low-confidence replies contain chemical product names.
-- **SC-004**: **High Triage Clarity**: 90%+ of pilot users report that CropDoctor disease triage explanations (French/Darija) are easy to understand.
+- **SC-004**: **High Triage Clarity**: 90%+ of pilot users report that CropDoctor disease triage explanations (French/Darija) are easy to understand (Pilot User Feedback KPI; software performance SLA is <5s vision triage).
 - **SC-005**: **Zero Unsanctioned Scope Leakage**: 0 instances of automated hardware control, voice processing, or billing workflows introduced into the system.
 
 ## Assumptions

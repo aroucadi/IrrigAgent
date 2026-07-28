@@ -27,7 +27,7 @@
 
 - [x] T004 Implement environment configuration loader and validator in `app/config.py`
 - [x] T005 [P] Implement Firestore DB client & collection helpers (`farm_profiles`, `irrigation_recommendations`, `disease_triage_requests`) in `app/firestore_client.py`
-- [x] T006 [P] Implement Meta WhatsApp Cloud API Graph API helper functions (`send_text_message`, `download_media`) in `app/whatsapp.py`
+- [x] T006 [P] Implement Meta WhatsApp Cloud API Graph API helper functions (`send_text_message` with 1 retry on delivery failure, `download_media`) in `app/whatsapp.py`
 - [x] T007 Implement FastAPI app initialization, router setup, and GET `/webhook` handshake verification in `app/main.py`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
@@ -42,7 +42,7 @@
 - [x] T008 [P] [US1] Implement Open-Meteo API client with 3 short-backoff retries (10s/30s/60s) and ET₀ baseline fallback in `app/weather.py`
 - [x] T009 [P] [US1] Implement deterministic rule-based irrigation recommendation logic in `app/decision.py`
 - [x] T010 [P] [US1] Implement narrow rule-based regex parser (`[+-]\d+\s*min`, `\d{1,2}:\d{2}|\d{1,2}h\d{0,2}`) for Option 3 modification text in `app/regex_parser.py`
-- [x] T011 [US1] Implement daily recommendation batch execution endpoint (`POST /jobs/daily-recommendations`) in `app/main.py` (depends on T008, T009)
+- [x] T011 [US1] Implement daily recommendation batch execution endpoint (`POST /jobs/daily-recommendations`) in `app/main.py` (with 1 delivery retry & admin flagging on failure; depends on T008, T009)
 - [x] T012 [US1] Implement POST `/webhook` event handler for incoming text replies (`1`, `2`, `3`) in `app/main.py` (depends on T010)
 - [x] T013 [P] [US1] Unit tests for decision rules and regex parser in `tests/unit/test_decision.py` and `tests/unit/test_regex_parser.py`
 
