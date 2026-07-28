@@ -1,12 +1,10 @@
 <!--
 ### Sync Impact Report
-- Version change: N/A (Initial Template) → 1.0.0
-- Modified principles: Replaced template placeholders with concrete governance principles based on PRD v0.4 / Section 14.3
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: N/A
 - Added sections:
-  - Core Principles (6 explicit principles: Human-in-the-loop, Rule-based logic, Mandatory ONSSA disclaimer, WhatsApp Cloud API Sandbox, Cut List Enforcement, End-to-End Demoability)
-  - Technical & Architectural Constraints
-  - Development & Spec-Driven Workflow
-- Removed sections: N/A (placeholder template overwritten)
+  - Core Principles: Added VII. Infrastructure as Code (NON-NEGOTIABLE) requiring Terraform/HCL or TypeScript for all GCP infrastructure.
+- Removed sections: N/A
 - Templates requiring updates:
   - ✅ .specify/templates/plan-template.md (Constitution Check gate verified)
   - ✅ .specify/templates/spec-template.md (Scope/constraints verified)
@@ -46,10 +44,14 @@ Any feature request or code addition introducing cut list capabilities MUST be r
 ### VI. End-to-End Demoability
 Every feature in scope MUST be testable and demoable end-to-end with a real WhatsApp test recipient number before being considered complete.
 
+### VII. Infrastructure as Code (NON-NEGOTIABLE)
+All GCP infrastructure components (Cloud Run, Firestore, Cloud Scheduler, Secret Manager, IAM) MUST be defined as Infrastructure as Code using Terraform/HCL or TypeScript (e.g., Pulumi/CDKTF). Manual GCP Console configuration ("clicking") is strictly prohibited for production and staging environments to ensure reproducibility, auditability, and zero configuration drift.
+
 ## Technical & Architectural Constraints
 
 - **Messaging Infrastructure**: Meta WhatsApp Cloud API Sandbox tier only (max 5 verified recipient phone numbers).
 - **Backend Stack**: Python 3.11+, FastAPI web service deployed on GCP Cloud Run.
+- **Infrastructure Provisioning**: Terraform/HCL or TypeScript for all GCP resources (Cloud Run, Firestore, Cloud Scheduler, Secret Manager, IAM).
 - **Data Persistence**: Firestore for farm profiles and interaction logs only; flat, lightweight schemas.
 - **External Integrations**: Open-Meteo API for daily weather/ET₀ data; Gemini 1.5 Flash via Vertex AI for leaf photo triage.
 - **Resource Constraints**: Designed for solo founder execution within GCP credit limits ($10k hackathon credits).
@@ -70,4 +72,4 @@ Every feature in scope MUST be testable and demoable end-to-end with a real What
   - **MINOR**: Addition of new principles, expanded scope boundaries, or governance rules.
   - **PATCH**: Clarifications, formatting, typo corrections, and non-semantic refinements.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-28
+**Version**: 1.1.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-28
