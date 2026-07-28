@@ -1,0 +1,1 @@
+"""IrrigAgent AI application package."""

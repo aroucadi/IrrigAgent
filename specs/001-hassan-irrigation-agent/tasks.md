@@ -15,9 +15,9 @@
 
 **Purpose**: Project initialization and directory structure
 
-- [ ] T001 Create project layout (`app/`, `tests/unit/`, `tests/integration/`) per implementation plan
-- [ ] T002 Initialize dependencies in `requirements.txt` (fastapi, uvicorn, httpx, google-cloud-firestore, google-genai, pydantic, python-dotenv)
-- [ ] T003 [P] Create `.env.example` with environment variable definitions in `.env.example`
+- [x] T001 Create project layout (`app/`, `tests/unit/`, `tests/integration/`) per implementation plan
+- [x] T002 Initialize dependencies in `requirements.txt` (fastapi, uvicorn, httpx, google-cloud-firestore, google-genai, pydantic, python-dotenv)
+- [x] T003 [P] Create `.env.example` with environment variable definitions in `.env.example`
 
 ---
 
@@ -25,10 +25,10 @@
 
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
-- [ ] T004 Implement environment configuration loader and validator in `app/config.py`
-- [ ] T005 [P] Implement Firestore DB client & collection helpers (`farm_profiles`, `irrigation_recommendations`, `disease_triage_requests`) in `app/firestore_client.py`
-- [ ] T006 [P] Implement Meta WhatsApp Cloud API Graph API helper functions (`send_text_message`, `download_media`) in `app/whatsapp.py`
-- [ ] T007 Implement FastAPI app initialization, router setup, and GET `/webhook` handshake verification in `app/main.py`
+- [x] T004 Implement environment configuration loader and validator in `app/config.py`
+- [x] T005 [P] Implement Firestore DB client & collection helpers (`farm_profiles`, `irrigation_recommendations`, `disease_triage_requests`) in `app/firestore_client.py`
+- [x] T006 [P] Implement Meta WhatsApp Cloud API Graph API helper functions (`send_text_message`, `download_media`) in `app/whatsapp.py`
+- [x] T007 Implement FastAPI app initialization, router setup, and GET `/webhook` handshake verification in `app/main.py`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -39,12 +39,12 @@
 **Goal**: Deliver a proactive evening irrigation advisory (19:00 GMT+1) via WhatsApp with one-tap reply options (`1` Approve, `2` Skip, `3` Modify).  
 **Independent Test**: Trigger daily batch job (`POST /jobs/daily-recommendations`), verify WhatsApp message delivery, reply `1`, `2`, or `3 "+10 min at 05:00"`, and verify Firestore document status updates.
 
-- [ ] T008 [P] [US1] Implement Open-Meteo API client with 3 short-backoff retries (10s/30s/60s) and ET₀ baseline fallback in `app/weather.py`
-- [ ] T009 [P] [US1] Implement deterministic rule-based irrigation recommendation logic in `app/decision.py`
-- [ ] T010 [P] [US1] Implement narrow rule-based regex parser (`[+-]\d+\s*min`, `\d{1,2}:\d{2}|\d{1,2}h\d{0,2}`) for Option 3 modification text in `app/regex_parser.py`
-- [ ] T011 [US1] Implement daily recommendation batch execution endpoint (`POST /jobs/daily-recommendations`) in `app/main.py` (depends on T008, T009)
-- [ ] T012 [US1] Implement POST `/webhook` event handler for incoming text replies (`1`, `2`, `3`) in `app/main.py` (depends on T010)
-- [ ] T013 [P] [US1] Unit tests for decision rules and regex parser in `tests/unit/test_decision.py` and `tests/unit/test_regex_parser.py`
+- [x] T008 [P] [US1] Implement Open-Meteo API client with 3 short-backoff retries (10s/30s/60s) and ET₀ baseline fallback in `app/weather.py`
+- [x] T009 [P] [US1] Implement deterministic rule-based irrigation recommendation logic in `app/decision.py`
+- [x] T010 [P] [US1] Implement narrow rule-based regex parser (`[+-]\d+\s*min`, `\d{1,2}:\d{2}|\d{1,2}h\d{0,2}`) for Option 3 modification text in `app/regex_parser.py`
+- [x] T011 [US1] Implement daily recommendation batch execution endpoint (`POST /jobs/daily-recommendations`) in `app/main.py` (depends on T008, T009)
+- [x] T012 [US1] Implement POST `/webhook` event handler for incoming text replies (`1`, `2`, `3`) in `app/main.py` (depends on T010)
+- [x] T013 [P] [US1] Unit tests for decision rules and regex parser in `tests/unit/test_decision.py` and `tests/unit/test_regex_parser.py`
 
 **Checkpoint**: User Story 1 (Hero Feature MVP) fully functional and testable independently
 
@@ -55,10 +55,10 @@
 **Goal**: Multimodal leaf photo disease triage via WhatsApp using Gemini 1.5 Flash, confidence-tiered safety rules, static ONSSA product lookup table, and mandatory disclaimer.  
 **Independent Test**: Send a leaf photo via WhatsApp, verify diagnostic response text, static ONSSA product pointer (for High/Med confidence), product omission (for Low confidence), and verbatim ONSSA disclaimer.
 
-- [ ] T014 [P] [US2] Implement static ONSSA product lookup dictionary for pilot crops (tomatoes, citrus) in `app/cropdoctor.py`
-- [ ] T015 [US2] Implement Gemini 1.5 Flash vision client and confidence-tiered diagnosis generator (High/Med/Low rules) in `app/cropdoctor.py` (depends on T014)
-- [ ] T016 [US2] Integrate incoming WhatsApp image event handling in `app/main.py` (download image via `app/whatsapp.py`, execute CropDoctor triage, reply with verbatim ONSSA disclaimer)
-- [ ] T017 [P] [US2] Unit tests for CropDoctor confidence rules and static ONSSA lookup in `tests/unit/test_cropdoctor.py`
+- [x] T014 [P] [US2] Implement static ONSSA product lookup dictionary for pilot crops (tomatoes, citrus) in `app/cropdoctor.py`
+- [x] T015 [US2] Implement Gemini 1.5 Flash vision client and confidence-tiered diagnosis generator (High/Med/Low rules) in `app/cropdoctor.py` (depends on T014)
+- [x] T016 [US2] Integrate incoming WhatsApp image event handling in `app/main.py` (download image via `app/whatsapp.py`, execute CropDoctor triage, reply with verbatim ONSSA disclaimer)
+- [x] T017 [P] [US2] Unit tests for CropDoctor confidence rules and static ONSSA lookup in `tests/unit/test_cropdoctor.py`
 
 **Checkpoint**: User Stories 1 AND 2 both functional and testable independently
 
@@ -69,9 +69,9 @@
 **Goal**: Zero-friction onboarding via WhatsApp with a dual-language initial greeting and rule-based Arabizi detection heuristic (`3`,`7`,`9`).  
 **Independent Test**: Send a message from a new sandbox number, verify dual-language greeting, reply in Arabizi, and verify `preferred_language` auto-flips to Darija in Firestore.
 
-- [ ] T018 [US3] Implement rule-based Arabizi detection heuristic (`3`,`7`,`9` digit substitutions & Arabic script) in `app/firestore_client.py`
-- [ ] T019 [US3] Implement dual-language onboarding initial greeting and profile registration handler in `app/main.py` (depends on T018)
-- [ ] T020 [P] [US3] Integration test for webhook endpoints & onboarding flows in `tests/integration/test_webhook.py`
+- [x] T018 [US3] Implement rule-based Arabizi detection heuristic (`3`,`7`,`9` digit substitutions & Arabic script) in `app/firestore_client.py`
+- [x] T019 [US3] Implement dual-language onboarding initial greeting and profile registration handler in `app/main.py` (depends on T018)
+- [x] T020 [P] [US3] Integration test for webhook endpoints & onboarding flows in `tests/integration/test_webhook.py`
 
 **Checkpoint**: All user stories independently functional
 
@@ -81,9 +81,9 @@
 
 **Purpose**: Production deployment readiness and runnable validation scenarios
 
-- [ ] T021 [P] Create Dockerfile for GCP Cloud Run deployment in `Dockerfile`
-- [ ] T022 Run quickstart validation scenario suite against local running app per `quickstart.md`
-- [ ] T023 [P] Final documentation review and code cleanup across `app/` and `README.md`
+- [x] T021 [P] Create Dockerfile for GCP Cloud Run deployment in `Dockerfile`
+- [x] T022 Run quickstart validation scenario suite against local running app per `quickstart.md`
+- [x] T023 [P] Final documentation review and code cleanup across `app/` and `README.md`
 
 ---
 
