@@ -82,10 +82,10 @@
 **Goal**: Declarative Infrastructure as Code for GCP cloud resources (`infra/` module using Terraform HCL) per Constitution Principle VII.  
 **Independent Test**: Execute `terraform -chdir=infra init`, `validate`, and `plan` dry-run against a GCP project, verifying Cloud Run, Firestore Native, Cloud Scheduler 18:45 GMT+1, Secret Manager, and IAM service accounts with 0 errors.
 
-- [ ] T021 [P] [US4] Implement Terraform input variables (`project_id`, `region`, `container_image`, secrets) in `infra/variables.tf`
-- [ ] T022 [P] [US4] Implement Terraform GCP resources (`google_cloud_run_v2_service`, `google_firestore_database`, `google_cloud_scheduler_job`, `google_secret_manager_secret`, `google_service_account`, `google_project_iam_member`) in `infra/main.tf`
-- [ ] T023 [P] [US4] Implement Terraform outputs (`cloud_run_url`, service account emails, database name) in `infra/outputs.tf`
-- [ ] T024 [US4] Validate Terraform IaC module via `terraform -chdir=infra validate` and `terraform -chdir=infra plan` per `contracts/infra-contract.md` (depends on T021, T022, T023)
+- [x] T021 [P] [US4] Implement Terraform input variables (`project_id`, `region`, `container_image`, secrets) in `infra/variables.tf`
+- [x] T022 [P] [US4] Implement Terraform GCP resources (`google_cloud_run_v2_service`, `google_firestore_database`, `google_cloud_scheduler_job`, `google_secret_manager_secret`, `google_service_account`, `google_project_iam_member`) in `infra/main.tf`
+- [x] T023 [P] [US4] Implement Terraform outputs (`cloud_run_url`, service account emails, database name) in `infra/outputs.tf`
+- [x] T024 [US4] Validate Terraform IaC module via `terraform -chdir=infra validate` and `terraform -chdir=infra plan` per `contracts/infra-contract.md` (depends on T021, T022, T023)
 
 **Checkpoint**: Infrastructure-as-Code module fully specified, syntactically valid, and testable independently
 
@@ -96,7 +96,7 @@
 **Purpose**: Production deployment readiness and runnable validation scenarios
 
 - [x] T025 [P] Create Dockerfile for GCP Cloud Run deployment in `Dockerfile`
-- [ ] T026 Run quickstart validation scenario suite against local app & Terraform module per `quickstart.md`
+- [x] T026 Run quickstart validation scenario suite against local app & Terraform module per `quickstart.md`
 - [x] T027 [P] Final documentation review and code cleanup across `app/`, `infra/`, and `README.md`
 
 ---
