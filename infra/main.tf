@@ -184,9 +184,9 @@ resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
 
 resource "google_cloud_scheduler_job" "daily_advisory_trigger" {
   name        = "irrigagent-daily-advisory-trigger"
-  description = "Triggers proactive evening irrigation recommendation batch job daily at 18:45 GMT+1."
-  schedule    = "45 17 * * *" # 17:45 UTC = 18:45 GMT+1 (UTC+1)
-  time_zone   = "UTC"
+  description = "Triggers proactive evening irrigation recommendation batch job daily at 18:45 Africa/Casablanca."
+  schedule    = "45 18 * * *"
+  time_zone   = "Africa/Casablanca"
 
   http_target {
     http_method = "POST"
