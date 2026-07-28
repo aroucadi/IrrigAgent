@@ -6,7 +6,7 @@
 ## Format: `[ID] [P?] [Story?] Description with file path`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Maps to user story from spec.md ([US1], [US2], [US3], [US4], [US5])
+- **[Story]**: Maps to user story from spec.md ([US1], [US2], [US3])
 - Includes exact file paths in descriptions
 
 ---
@@ -77,39 +77,13 @@
 
 ---
 
-## Phase 6: User Story 4 - Automated Infrastructure-as-Code Provisioning (Priority: P2) 🏗️ IaC
-
-**Goal**: Declarative Infrastructure as Code for GCP cloud resources (`infra/` modular HCL files `main.tf`, `variables.tf`, `outputs.tf`, `cloud_run.tf`, `secrets.tf`, `scheduler.tf`) per Constitution Principle VII.  
-**Independent Test**: Execute `terraform -chdir=infra init`, `validate`, and `plan` dry-run against a GCP project, verifying Cloud Run, Firestore Native, Cloud Scheduler 18:45 Africa/Casablanca, Secret Manager, and IAM service accounts with 0 errors.
-
-- [x] T021 [P] [US4] Implement Terraform input variables (`project_id`, `region`, `container_image`, secrets) in `infra/variables.tf`
-- [x] T022 [P] [US4] Implement modular Terraform GCP resources in `infra/main.tf`, `infra/cloud_run.tf`, `infra/secrets.tf`, and `infra/scheduler.tf` (Cloud Run v2, Firestore Native, Cloud Scheduler 18:45 Africa/Casablanca, Secret Manager, IAM service accounts)
-- [x] T023 [P] [US4] Implement Terraform outputs (`cloud_run_url`, service account emails, database name) in `infra/outputs.tf`
-- [x] T024 [US4] Validate Terraform IaC module via `terraform -chdir=infra validate` and `terraform -chdir=infra plan` per `contracts/infra-contract.md` (depends on T021, T022, T023)
-
-**Checkpoint**: Infrastructure-as-Code module fully specified, syntactically valid, and testable independently
-
----
-
-## Phase 7: User Story 5 - Automated GitHub Actions CI/CD Pipeline (Priority: P2) 🚀 CI/CD
-
-**Goal**: Automated GitHub Actions CI/CD deployment workflow (`.github/workflows/deploy.yml`) building/pushing Docker images to GCP Artifact Registry and running `terraform apply` on push to `main`.  
-**Independent Test**: Push a commit to `main`, verify GitHub Actions workflow execution in `.github/workflows/deploy.yml`, container build/push, and non-interactive `terraform apply` infrastructure reconciliation.
-
-- [x] T025 [P] [US5] Implement GitHub Actions CI/CD deployment workflow in `.github/workflows/deploy.yml`
-- [x] T026 [US5] Execute CI/CD workflow validation and dry-run syntax check against GCP Artifact Registry and Terraform IaC rules (depends on T025)
-
-**Checkpoint**: Automated GitHub Actions deployment pipeline fully configured and verified
-
----
-
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 6: Polish & Cross-Cutting Concerns
 
 **Purpose**: Production deployment readiness and runnable validation scenarios
 
-- [x] T027 [P] Create Dockerfile for GCP Cloud Run deployment in `Dockerfile`
-- [x] T028 Run quickstart validation scenario suite against local app, modular Terraform module, and GitHub Actions workflow per `quickstart.md`
-- [x] T029 [P] Final documentation review and code cleanup across `app/`, `infra/`, `.github/`, and `README.md`
+- [x] T021 [P] Create Dockerfile for GCP Cloud Run deployment in `Dockerfile`
+- [x] T022 Run quickstart validation scenario suite against local app & Cloud Run CLI deployment per `quickstart.md`
+- [x] T023 [P] Final documentation review and code cleanup across `app/`, `specs/`, and `README.md`
 
 ---
 
@@ -121,12 +95,9 @@ graph TD
     Phase2 --> US1[Phase 3: US1 - IrrigAgent MVP]
     Phase2 --> US2[Phase 4: US2 - CropDoctor]
     Phase2 --> US3[Phase 5: US3 - Profile & Onboarding]
-    Phase2 --> US4[Phase 6: US4 - Infrastructure as Code]
-    US4 --> US5[Phase 7: US5 - GitHub Actions CI/CD]
-    US1 --> Polish[Phase 8: Polish & Validation]
+    US1 --> Polish[Phase 6: Polish & Validation]
     US2 --> Polish
     US3 --> Polish
-    US5 --> Polish
 ```
 
 ---
@@ -139,4 +110,4 @@ graph TD
 3. **STOP and VALIDATE**: Test User Story 1 end-to-end via `POST /webhook` and `POST /jobs/daily-recommendations`.
 
 ### Incremental Delivery
-1. Foundation -> 2. IrrigAgent MVP -> 3. CropDoctor Module -> 4. Zero-Friction Onboarding -> 5. Infrastructure as Code (`infra/`) -> 6. GitHub Actions CI/CD (`.github/workflows/deploy.yml`) -> 7. Cloud Run Deploy.
+1. Foundation -> 2. IrrigAgent MVP -> 3. CropDoctor Module -> 4. Zero-Friction Onboarding -> 5. Cloud Run CLI Deployment (`gcloud run deploy`).
