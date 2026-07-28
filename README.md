@@ -30,6 +30,10 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 - **Mandatory ONSSA Regulatory Disclaimer**: Every response appends:
   > *"This is a first-pass triage only. It does not replace advice from a licensed agronomist or the official product label. Always verify with ONSSA-authorized products."*
 
+### 🛡️ Quality & Security Gate Module
+- **Automated Pre-Commit Hooks**: 3-stage local verification gate enforcing Secret Scanning (Meta tokens, GCP keys, Firestore credentials), Code Linting & Formatting (`ruff`, `black`), and Fast Unit Tests (`pytest tests/unit/ -v` under 3 seconds).
+- **Cross-Platform Scripting**: Dual POSIX shell (`.sh`) and Windows PowerShell (`.ps1`) scripts for 1-command developer setup and execution.
+
 ---
 
 ## 🏗️ Technical Architecture & Infrastructure as Code
@@ -60,22 +64,27 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 
 This project is built following GitHub's [spec-kit](https://github.com/github/spec-kit) spec-driven workflow:
 
-- **Constitution**: [.specify/memory/constitution.md](.specify/memory/constitution.md)
+- **Constitution (v1.3.0)**: [.specify/memory/constitution.md](.specify/memory/constitution.md)
   - **Human-in-the-loop strictly enforced** (No automated valve/hardware control in v1)
   - **Rule-based logic first** before LLM upgrades
   - **Mandatory ONSSA disclaimer** on all CropDoctor responses
   - **Sandbox messaging tier only** (Max 5 test numbers)
   - **Strict cut list** (No voice, no payments, no sensor hardware integration)
   - **Infrastructure as Code (Principle VII)**: 100% of GCP cloud resources provisioned declaratively via Terraform (0 manual GCP Console edits)
+  - **Quality & Security Gates (Principle VIII)**: Zero-broken-tests policy, deterministic calculation/parsing test coverage, zero secrets in code, and mandatory pre-commit hooks
 
-### 📁 Active Feature Design Artifacts (`001-hassan-irrigation-agent`)
-- **Feature Specification**: [specs/001-hassan-irrigation-agent/spec.md](specs/001-hassan-irrigation-agent/spec.md)
-- **Architecture Implementation Plan**: [specs/001-hassan-irrigation-agent/plan.md](specs/001-hassan-irrigation-agent/plan.md)
-- **Actionable Task Breakdown (29 Tasks)**: [specs/001-hassan-irrigation-agent/tasks.md](specs/001-hassan-irrigation-agent/tasks.md)
-- **Technical Research**: [specs/001-hassan-irrigation-agent/research.md](specs/001-hassan-irrigation-agent/research.md)
-- **Data Model & ONSSA Lookup Schema**: [specs/001-hassan-irrigation-agent/data-model.md](specs/001-hassan-irrigation-agent/data-model.md)
-- **Interface Contracts**: [specs/001-hassan-irrigation-agent/contracts/](specs/001-hassan-irrigation-agent/contracts/)
-- **Runnable Validation Guide**: [specs/001-hassan-irrigation-agent/quickstart.md](specs/001-hassan-irrigation-agent/quickstart.md)
+### 📁 Feature Design Artifacts
+
+#### Feature 001: IrrigAgent Core (`001-hassan-irrigation-agent`)
+- **Specification**: [specs/001-hassan-irrigation-agent/spec.md](specs/001-hassan-irrigation-agent/spec.md)
+- **Implementation Plan**: [specs/001-hassan-irrigation-agent/plan.md](specs/001-hassan-irrigation-agent/plan.md)
+- **Tasks**: [specs/001-hassan-irrigation-agent/tasks.md](specs/001-hassan-irrigation-agent/tasks.md)
+
+#### Feature 002: Quality & Security Gate Module (`002-quality-security-gate`)
+- **Specification**: [specs/002-quality-security-gate/spec.md](specs/002-quality-security-gate/spec.md)
+- **Implementation Plan**: [specs/002-quality-security-gate/plan.md](specs/002-quality-security-gate/plan.md)
+- **Tasks (Completed)**: [specs/002-quality-security-gate/tasks.md](specs/002-quality-security-gate/tasks.md)
+- **Quickstart & Verification**: [specs/002-quality-security-gate/quickstart.md](specs/002-quality-security-gate/quickstart.md)
 
 ---
 
@@ -87,10 +96,28 @@ This project is built following GitHub's [spec-kit](https://github.com/github/sp
 - Meta Developer Account (WhatsApp Cloud API App in Sandbox)
 - GCP Project with Cloud Run, Firestore, Secret Manager, Cloud Scheduler & Vertex AI enabled
 
-### Verification Commands
+### 1. Developer Git Pre-Commit Hook Setup
+Install the automated Quality & Security pre-commit hook with one command:
+
+**POSIX / Linux / macOS / Git Bash**:
 ```bash
-# Run unit & integration test suite
+bash scripts/install-hooks.sh
+```
+
+**Windows PowerShell**:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/install-hooks.ps1
+```
+
+### 2. Verification Commands
+```bash
+# Run full automated test suite (32 tests)
 pytest
+
+# Manually trigger pre-commit gate check
+bash scripts/pre-commit.sh
+# Or on Windows PowerShell:
+powershell -ExecutionPolicy Bypass -File scripts/pre-commit.ps1
 
 # Validate Terraform IaC module syntax
 terraform -chdir=infra validate

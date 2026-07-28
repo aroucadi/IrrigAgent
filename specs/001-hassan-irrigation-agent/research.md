@@ -1,100 +1,46 @@
-# Technical Research & Architecture Decisions: Hassan Persona
+# Technical Research & Architectural Decisions: Hassan Persona & Darija Voice Teaser
 
-**Feature**: Hassan Persona - Proactive Irrigation Agent & Leaf Photo Triage  
-**Branch**: `001-hassan-irrigation-agent`  
-**Date**: 2026-07-28
+**Branch**: `001-hassan-irrigation-agent` | **Date**: 2026-07-28 | **Spec**: [spec.md](spec.md)
 
----
+## Overview
 
-## 1. Web Framework & Application Structure
-
-### Decision
-Use **FastAPI (Python 3.11+)** with `uvicorn` as the web application container.
-
-### Rationale
-- Built-in asynchronous I/O natively supports non-blocking HTTP calls (`httpx`) to Meta Graph API, Open-Meteo, and Vertex AI.
-- Lightweight memory footprint (<80MB idle), enabling fast cold starts on GCP Cloud Run.
-- Pydantic v2 data validation for webhook payloads and Firestore model schemas.
-
-### Alternatives Considered
-- *Flask*: Synchronous by default, requires WSGI wrapping or threading for async HTTP client operations.
-- *Django*: Excessively heavy for a webhook API service; ORM and admin interface unnecessary for Firestore.
+This document outlines key technical decisions, architectural research, and design choices for the Hassan Irrigation Agent and the opt-in **Darija Voice Teaser Module** using Google Cloud Text-to-Speech (`ar-MA`).
 
 ---
 
-## 2. Meta WhatsApp Cloud API Integration
+## Technical Decisions
 
-### Decision
-Direct HTTP integration using `httpx.AsyncClient` against Meta Graph API `v20.0` sandbox endpoints.
-
-### Rationale
-- Sandbox tier supports up to 5 verified recipient phone numbers at $0 cost.
-- Direct Graph API calls (`/messages`, `/media`) avoid third-party wrapper library bloat or unmaintained dependencies.
-- Handles webhook verification handshake (`GET /webhook`) and event payload extraction (`POST /webhook`) cleanly.
-
-### Alternatives Considered
-- *Twilio / MessageBird*: Introduced unnecessary vendor cost, business verification overhead, and extra API latency.
+### Decision 1: Moroccan Darija Abstraction & Normalized Intent Schema
+- **Decision**: Implement a two-way translation abstraction layer. All internal business logic, ET₀ calculations, and CropDoctor disease triage execute strictly in English / structured Pydantic models. Incoming Arabic script, Arabizi, or voice transcriptions map to normalized English intent schemas before hitting decision logic. Outgoing text is converted into standard Arabic-script Darija (e.g., `دير ليا 10 دقايق زيادة غدا مع الـ 05:00`) for TTS rendering.
+- **Rationale**: Keeps decision engine 100% deterministic and eliminates AI hallucination risk in agronomy calculations and ONSSA chemical safety pointers.
+- **Alternatives Considered**: Direct LLM decision-making in Darija (rejected: high risk of numeric and chemical hallucination).
 
 ---
 
-## 3. Weather & Evapotranspiration (ET₀) Data Pipeline
-
-### Decision
-Pull daily weather forecast and FAO-56 Penman-Monteith ET₀ values from **Open-Meteo API** (`https://api.open-meteo.com/v1/forecast`).
-
-### Rationale
-- Free, open-access API requiring no API keys or subscription management.
-- Provides native `et0_fao_evapotranspiration` and `precipitation_sum` parameters by latitude/longitude.
-- Scheduled batch execution at 18:45 GMT+1 with 3 short-backoff retries (10s / 30s / 60s) fits inside a single Cloud Run job invocation before the 19:00 GMT+1 WhatsApp dispatch.
-- Fallback logic to yesterday's stored ET₀ baseline in Firestore ensures 100% daily advisory delivery even during API hiccups.
+### Decision 2: Google Cloud Text-to-Speech (ar-MA) & OGG_OPUS Encoding
+- **Decision**: Use `google-cloud-texttospeech` Python client library with `languageCode='ar-MA'` (Moroccan Arabic) and `AudioEncoding.OGG_OPUS` (`audio_config=texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.OGG_OPUS)`).
+- **Rationale**: `ar-MA` provides authentic Moroccan Arabic phoneme synthesis. `OGG_OPUS` matches Meta WhatsApp Cloud API voice message requirements (`audio/ogg; codecs=opus`) natively, enabling direct upload without requiring heavy `ffmpeg` binary dependencies in the Cloud Run container.
+- **Alternatives Considered**:
+  - MP3 encoding (rejected: requires local `ffmpeg` transcoding to OGG OPUS for WhatsApp native voice note waveform rendering).
+  - External TTS APIs like ElevenLabs (rejected: adds external cost, network latency, and non-standard GCP integration).
 
 ---
 
-## 4. CropDoctor Vision Triage & Safety Architecture
-
-### Decision
-Multimodal leaf photo triage using **Gemini 1.5 Flash via Vertex AI**, paired with a **Static ONSSA Product Lookup Table**.
-
-### Rationale
-- Gemini 1.5 Flash offers low latency (<3s) and cost-effective image analysis funded by GCP hackathon credits.
-- **Hallucination Elimination**: Gemini is strictly scoped to identify the pathogen/symptom and return a confidence rating. Treatment product pointers are retrieved via deterministic code lookup from a hardcoded Python dictionary of ~10–15 tomato and citrus pathogens mapped to ONSSA-authorized active ingredients.
-- **Confidence-Tiered Safety**:
-  - *High/Medium Confidence (>=50%)*: Primary diagnosis + static ONSSA product pointer + mandatory disclaimer.
-  - *Low Confidence (<50%)*: Cautious observation ("possible signs of discoloration, unable to confirm") + request for a clearer close-up photo + mandatory disclaimer (**NO chemical or product names provided**).
+### Decision 3: Asynchronous Non-Blocking Voice Teaser Workflow
+- **Decision**: Primary WhatsApp text/button confirmations execute synchronously within the HTTP webhook response loop (<1.0s latency SLA). Voice note generation (TTS synthesis, audio file staging, Meta Cloud API media upload, and `send_audio_message`) is dispatched asynchronously via FastAPI `BackgroundTasks` or `asyncio.create_task`.
+- **Rationale**: Preserves core sub-second production performance SLA while allowing live demo recordings to receive audio notes 1.5–2.5s later without blocking text delivery.
+- **Alternatives Considered**: Synchronous voice synthesis inside webhook response (rejected: total webhook duration exceeds 3.0s, risking Meta Cloud API webhook timeout and retries).
 
 ---
 
-## 5. Persistence & State Storage
-
-### Decision
-Use **Google Cloud Firestore** in Native Mode.
-
-### Rationale
-- Serverless document database scaling to zero cost when idle.
-- Flat schema structure with three simple collections:
-  1. `farm_profiles` (keyed by E.164 phone number)
-  2. `irrigation_recommendations` (keyed by `rec_{phone}_{YYYYMMDD}`)
-  3. `disease_triage_requests` (keyed by `triage_{phone}_{timestamp}`)
-- Fast document read/write latency (<20ms).
+### Decision 4: Latin Arabizi Pre-Translation Pipeline
+- **Decision**: Route incoming or generated Latin Arabizi text through an LLM translation step to convert Arabizi strings into standard Arabic script Darija (e.g., `dir 10 min zeyada` → `دير 10 دقايق زيادة`) prior to sending text to GCP TTS `ar-MA`.
+- **Rationale**: GCP TTS `ar-MA` synthesizer is tuned for Arabic script text. Passing Latin characters with numbers (e.g., `3afak`, `9dim`) results in garbled letter-by-letter English pronunciation or synthesis errors.
+- **Alternatives Considered**: Rule-based regex translation for Arabizi numbers (rejected: Arabizi vocabulary varies too widely for simple regex replacement).
 
 ---
 
-## 6. Infrastructure-as-Code (IaC) & Deployment Architecture
-
-### Decision
-Use **Terraform (HCL v1.5+)** with the HashiCorp Google Provider (`hashicorp/google`) located under an **`infra/`** directory (`main.tf`, `variables.tf`, `outputs.tf`).
-
-### Rationale
-- **100% Constitution Compliance**: Adheres strictly to Constitution Principle VII requiring declarative Infrastructure as Code and zero manual GCP Console clicks.
-- **Resource Scope**:
-  1. `google_cloud_run_v2_service`: Deploys FastAPI container service with autoscaling (min instances 0, max 5).
-  2. `google_firestore_database`: Provisions Firestore Database instance in Native Mode.
-  3. `google_cloud_scheduler_job`: Configures 18:45 GMT+1 cron HTTP trigger pointing to Cloud Run `POST /jobs/daily-recommendations` endpoint with secure OIDC token authentication.
-  4. `google_secret_manager_secret` & `version`: Stores sensitive secrets (`WHATSAPP_TOKEN`, `VERIFY_TOKEN`, `CRON_SECRET`).
-  5. `google_service_account` & `google_project_iam_member`: Creates dedicated service accounts (`irrigagent-cloudrun-sa`, `irrigagent-scheduler-sa`) with least-privilege IAM roles (`roles/datastore.user`, `roles/secretmanager.secretAccessor`, `roles/run.invoker`).
-- **Reproducibility & Drift Prevention**: Enables rapid environment creation (staging, production) via `terraform apply` with zero manual configuration steps.
-
-### Alternatives Considered
-- *Pulumi TypeScript*: Required extra Node.js runtime setup and state backend management; Terraform HCL provides native, zero-dependency GCP provider integration with standard CLI tooling.
-- *Manual GCP Console Setup*: Expressly prohibited by Constitution Principle VII due to lack of reproducibility, auditability, and vulnerability to configuration drift.
-
+### Decision 5: Feature Flag Control (`ENABLE_DARIJA_VOICE_TEASER`)
+- **Decision**: Expose environment variable `ENABLE_DARIJA_VOICE_TEASER` (`bool`, default `false`). When set to `false`, voice note dispatch is completely bypassed at zero runtime cost.
+- **Rationale**: Protects automated integration tests, CI pipelines, and core production runs from unwanted TTS API quota usage and latency. Enables demo mode seamlessly during live incubator pitches.
+- **Alternatives Considered**: Hardcoded feature toggles (rejected: requires code edits for demo vs testing).

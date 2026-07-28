@@ -14,3 +14,6 @@ GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "irrigagent-dev")
 
 # Batch Job Protection Token
 JOB_SECRET_TOKEN = os.getenv("JOB_SECRET_TOKEN", "irrigagent_secret_token")
+
+# Voice Teaser Feature Flag
+ENABLE_DARIJA_VOICE_TEASER = os.getenv("ENABLE_DARIJA_VOICE_TEASER", "false").lower() in ("true", "1", "yes")

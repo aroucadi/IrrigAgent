@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
-from fastapi import FastAPI, Request, Response, Query, Header, HTTPException
+from fastapi import FastAPI, Request, Response, Query, Header, HTTPException, BackgroundTasks
 from typing import Optional
 
-from app.config import VERIFY_TOKEN, JOB_SECRET_TOKEN
-from app.whatsapp import send_text_message, extract_incoming_message, download_media
+from app.config import VERIFY_TOKEN, JOB_SECRET_TOKEN, ENABLE_DARIJA_VOICE_TEASER
+from app.whatsapp import send_text_message, send_audio_message, upload_media, extract_incoming_message, download_media
 from app.weather import get_et0_forecast
 from app.decision import evaluate_irrigation_recommendation
 from app.regex_parser import parse_modification_text
 from app.cropdoctor import perform_cropdoctor_triage
+from app.tts_voice import synthesize_darija_audio
 from app.firestore_client import (
     get_farm_profile,
     save_farm_profile,
@@ -16,14 +17,33 @@ from app.firestore_client import (
     get_latest_recommendation_for_user,
     save_triage_request,
     detect_arabizi_or_arabic,
+    parse_profile_command,
 )
 
 app = FastAPI(title="IrrigAgent AI", version="1.0.0")
 
 
+async def dispatch_darija_voice_teaser(phone: str, text_intent: str):
+    """Asynchronous non-blocking task to synthesize and transmit Moroccan Darija voice note."""
+    if not ENABLE_DARIJA_VOICE_TEASER:
+        return
+    try:
+        audio_bytes = await synthesize_darija_audio(text_intent)
+        media_id = await upload_media(audio_bytes, mime_type="audio/ogg; codecs=opus", filename="voice.ogg")
+        await send_audio_message(phone, media_id)
+    except Exception:
+        # Non-blocking silent fallback per FR-032 / SC-006
+        pass
+
+
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "app": "IrrigAgent AI", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "app": "IrrigAgent AI",
+        "version": "1.0.0",
+        "voice_teaser_enabled": ENABLE_DARIJA_VOICE_TEASER,
+    }
 
 
 @app.get("/webhook")
@@ -39,7 +59,7 @@ async def verify_webhook(
 
 
 @app.post("/webhook")
-async def receive_webhook(request: Request):
+async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
     """Receive incoming WhatsApp messages (text replies and leaf photo images)."""
     payload = await request.json()
     incoming = extract_incoming_message(payload)
@@ -82,7 +102,7 @@ async def receive_webhook(request: Request):
         await send_text_message(sender, greeting_msg)
         return {"status": "welcomed"}
 
-    # Handle Leaf Photo Image Event (CropDoctor)
+    # 1. Handle Leaf Photo Image Event (CropDoctor)
     if msg_type == "image" or image_id:
         try:
             image_bytes = await download_media(image_id or "mock_img_1")
@@ -99,6 +119,7 @@ async def receive_webhook(request: Request):
                 "confidence_tier": triage_result["confidence_tier"],
                 "onssa_product_pointer": triage_result["onssa_product_pointer"],
                 "disclaimer_included": triage_result["disclaimer_included"],
+                "is_unreadable": triage_result.get("is_unreadable", False),
                 "response_text": triage_result["response_text"],
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
@@ -106,7 +127,7 @@ async def receive_webhook(request: Request):
             
             # Send WhatsApp response to Hassan
             await send_text_message(sender, triage_result["response_text"])
-            return {"status": "triage_completed"}
+            return {"status": "triage_completed" if not triage_result.get("is_unreadable") else "triage_unreadable"}
         except Exception as e:
             error_msg = (
                 "🍃 *CropDoctor Advisory*\n"
@@ -116,7 +137,16 @@ async def receive_webhook(request: Request):
             await send_text_message(sender, error_msg)
             return {"status": "triage_error", "error": str(e)}
 
-    # Handle Text One-Tap Replies (1 = Approve, 2 = Skip, 3 = Modify)
+    # 2. Check for Profile View / Update Commands (FR-018)
+    is_prof_cmd, updated_fields, prof_msg = parse_profile_command(text, profile)
+    if is_prof_cmd:
+        if updated_fields:
+            profile.update(updated_fields)
+            await save_farm_profile(profile)
+        await send_text_message(sender, prof_msg)
+        return {"status": "profile_command_processed", "updated_fields": updated_fields}
+
+    # 3. Handle Text One-Tap Replies (1 = Approve, 2 = Skip, 3 = Modify)
     latest_rec = await get_latest_recommendation_for_user(sender)
     
     if text == "1":
@@ -127,6 +157,8 @@ async def receive_webhook(request: Request):
             latest_rec["responded_at"] = datetime.now(timezone.utc).isoformat()
             await save_recommendation(latest_rec)
         await send_text_message(sender, reply_msg)
+        if ENABLE_DARIJA_VOICE_TEASER:
+            background_tasks.add_task(dispatch_darija_voice_teaser, sender, "approved")
         return {"status": "approved"}
 
     elif text == "2":
@@ -137,6 +169,8 @@ async def receive_webhook(request: Request):
             latest_rec["responded_at"] = datetime.now(timezone.utc).isoformat()
             await save_recommendation(latest_rec)
         await send_text_message(sender, reply_msg)
+        if ENABLE_DARIJA_VOICE_TEASER:
+            background_tasks.add_task(dispatch_darija_voice_teaser, sender, "skipped")
         return {"status": "skipped"}
 
     elif text.startswith("3"):
@@ -154,23 +188,30 @@ async def receive_webhook(request: Request):
             latest_rec["responded_at"] = datetime.now(timezone.utc).isoformat()
             await save_recommendation(latest_rec)
         await send_text_message(sender, ack_msg)
+        if ENABLE_DARIJA_VOICE_TEASER:
+            background_tasks.add_task(dispatch_darija_voice_teaser, sender, custom_input or "modified")
         return {"status": "modified"}
 
     else:
-        # Default prompt for unrecognized text
+        # Default prompt for unrecognized text (gentle reminder per FR-019)
         fallback_msg = (
             "🌾 *IrrigAgent AI*\n"
-            "Please reply with:\n"
-            "1 = Approve\n"
-            "2 = Skip\n"
-            "3 = Modify (e.g. '+10 min at 05:00')"
+            "Options valides / Chnou t'qdar t'jaweb:\n"
+            "1 = Approuver / Approve\n"
+            "2 = Ignorer / Skip\n"
+            "3 = Modifier (ex: '+10 min at 05:00')\n"
+            "Ou mettez à jour votre profil: 'update crop tomatoes' / 'update area 8 ha'."
         )
         await send_text_message(sender, fallback_msg)
-        return {"status": "prompt_sent"}
+        return {"status": "reminder_sent"}
 
 
 @app.post("/jobs/daily-recommendations")
-async def trigger_daily_recommendations(authorization: Optional[str] = Header(None)):
+@app.post("/api/v1/jobs/daily-advisory")
+async def trigger_daily_recommendations(
+    background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None)
+):
     """18:45 GMT+1 Batch recommendation execution job."""
     if authorization != f"Bearer {JOB_SECRET_TOKEN}":
         raise HTTPException(status_code=401, detail="Unauthorized job execution token")
@@ -212,10 +253,12 @@ async def trigger_daily_recommendations(authorization: Optional[str] = Header(No
         }
         await save_recommendation(rec_record)
 
-        # 4. Dispatch WhatsApp message
+        # 4. Dispatch WhatsApp text message
         try:
             await send_text_message(phone, rec_msg)
             dispatched_count += 1
+            if ENABLE_DARIJA_VOICE_TEASER:
+                background_tasks.add_task(dispatch_darija_voice_teaser, phone, rec_msg)
         except Exception:
             failed_count += 1
 

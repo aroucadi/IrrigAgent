@@ -81,3 +81,43 @@ def extract_incoming_message(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
         }
     except (KeyError, IndexError, AttributeError):
         return None
+
+
+async def upload_media(file_bytes: bytes, mime_type: str = "audio/ogg; codecs=opus", filename: str = "voice.ogg") -> str:
+    """Upload media binary to Meta WhatsApp Cloud API and return media_id."""
+    if _is_mock_token(WHATSAPP_TOKEN):
+        return "mock_media_id_123"
+
+    url = f"{GRAPH_BASE_URL}/{WHATSAPP_PHONE_NUMBER_ID}/media"
+    headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
+    files = {
+        "file": (filename, file_bytes, mime_type),
+        "messaging_product": (None, "whatsapp"),
+        "type": (None, mime_type),
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(url, headers=headers, files=files)
+        resp.raise_for_status()
+        return resp.json().get("id", "")
+
+
+async def send_audio_message(to: str, media_id: str) -> Dict[str, Any]:
+    """Send an audio voice note message via WhatsApp Cloud API using media_id."""
+    if _is_mock_token(WHATSAPP_TOKEN) or media_id.startswith("mock_"):
+        return {"messaging_product": "whatsapp", "contacts": [{"wa_id": to}], "messages": [{"id": "mock_wamid_audio_456"}]}
+
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": "audio",
+        "audio": {"id": media_id},
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(MESSAGES_URL, headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json()

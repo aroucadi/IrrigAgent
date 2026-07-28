@@ -1,50 +1,89 @@
-# Quickstart Validation Guide: Hassan Persona
+# Quickstart & Runnable Validation Guide
 
-**Feature**: Hassan Persona - Proactive Irrigation Agent & Leaf Photo Triage  
-**Branch**: `001-hassan-irrigation-agent`  
-**Date**: 2026-07-28
+**Branch**: `001-hassan-irrigation-agent` | **Date**: 2026-07-28 | **Spec**: [spec.md](spec.md)
 
----
+## Prerequisites
 
-## 🚀 Environment Setup & Prerequisites
-
-1. **Python Environment**: Python 3.11+
-2. **Environment File**: Create `.env` in the root directory:
-   ```env
-   WHATSAPP_TOKEN=EAAG...
-   WHATSAPP_PHONE_NUMBER_ID=1000...
-   VERIFY_TOKEN=my_secure_webhook_token_123
-   GRAPH_API_VERSION=v20.0
-   GCP_PROJECT_ID=irrigagent-dev
-   JOB_SECRET_TOKEN=my_batch_job_secret_456
-   ```
-
-3. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run Application**:
-   ```bash
-   uvicorn app.main:app --reload --port 8080
-   ```
+- **Python**: Python 3.11 or higher
+- **GCP Service Account**: Valid GCP credentials set in `GOOGLE_APPLICATION_CREDENTIALS` with access to Firestore and Cloud Text-to-Speech API (`ar-MA`).
+- **Meta WhatsApp Cloud API Sandbox**: Registered test phone number and access token.
 
 ---
 
-## 🧪 Runnable Validation Scenarios
+## Environment Setup
 
-### Scenario 1: Webhook Verification Handshake (GET `/webhook`)
-Verify Meta Graph API handshake protocol.
+Create or update `.env` in repository root:
 
 ```bash
-curl -X GET "http://localhost:8080/webhook?hub.mode=subscribe&hub.verify_token=my_secure_webhook_token_123&hub.challenge=CHALLENGE_ACCEPTED"
+# Core Configuration
+PORT=8080
+LOG_LEVEL=INFO
+
+# WhatsApp Cloud API Credentials
+WHATSAPP_TOKEN="EAAG..."
+WHATSAPP_PHONE_ID="123456789"
+WHATSAPP_VERIFY_TOKEN="irrigagent_secret_token_2026"
+
+# GCP Credentials & Project
+GCP_PROJECT_ID="irrigagent-prod"
+
+# Voice Teaser Feature Flag (Opt-in Demo Mode)
+ENABLE_DARIJA_VOICE_TEASER=true
 ```
-**Expected Outcome**: Returns HTTP 200 with body `CHALLENGE_ACCEPTED`.
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
-### Scenario 2: Simulate Incoming One-Tap Reply (`1` Approve)
-Simulate Hassan replying `1` to approve tomorrow's irrigation recommendation.
+## Unit & Integration Testing
+
+Run full test suite:
+
+```bash
+pytest tests/ -v
+```
+
+Run specific module tests:
+
+```bash
+# Test deterministic decision engine & rainfall fallback
+pytest tests/unit/test_decision.py -v
+
+# Test narrow regex parser for Option 3 ("Modify") replies
+pytest tests/unit/test_regex_parser.py -v
+
+# Test CropDoctor multimodal vision triage & ONSSA disclaimer enforcement
+pytest tests/unit/test_cropdoctor.py -v
+
+# Test Open-Meteo weather retries & baseline fallback
+pytest tests/unit/test_weather.py -v
+
+# Test Google TTS ar-MA voice synthesis wrapper
+pytest tests/unit/test_tts_voice.py -v
+```
+
+---
+
+## Local Webhook Validation
+
+Start FastAPI local server:
+
+```bash
+uvicorn app.main:app --reload --port 8080
+```
+
+### 1. Test Webhook Verification GET Request
+
+```bash
+curl -X GET "http://localhost:8080/webhook?hub.mode=subscribe&hub.verify_token=irrigagent_secret_token_2026&hub.challenge=123456"
+```
+Expected output: `123456`
+
+### 2. Test Inbound Webhook Option 1 Approval (Sub-Second SLA)
 
 ```bash
 curl -X POST "http://localhost:8080/webhook" \
@@ -56,10 +95,10 @@ curl -X POST "http://localhost:8080/webhook" \
         "value": {
           "messaging_product": "whatsapp",
           "messages": [{
-            "from": "+212600000000",
-            "id": "wamid_test_1",
-            "timestamp": "1774782000",
-            "text": { "body": "1" },
+            "from": "212600000000",
+            "id": "wamid.123",
+            "timestamp": "1722180000",
+            "text": {"body": "1"},
             "type": "text"
           }]
         }
@@ -67,39 +106,19 @@ curl -X POST "http://localhost:8080/webhook" \
     }]
   }'
 ```
-**Expected Outcome**: Returns `{"status": "ok"}`. Logs state update in Firestore to `"approved"`, and sends WhatsApp confirmation `"Approved. Irrigation adjustment applied for tomorrow."`.
+Expected response: `{"status":"ok"}` in <1.0 second.
+If `ENABLE_DARIJA_VOICE_TEASER=true`, observe background task log for `ar-MA` OGG OPUS voice note synthesis and transmission.
 
 ---
 
-### Scenario 3: Trigger Daily Proactive Recommendation Batch (`POST /jobs/daily-recommendations`)
-Simulate the 18:45 Africa/Casablanca Cloud Scheduler batch run.
+## Production Cloud Run Deployment
 
-```bash
-curl -X POST "http://localhost:8080/jobs/daily-recommendations" \
-  -H "Authorization: Bearer my_batch_job_secret_456"
-```
-**Expected Outcome**: Returns `{"status": "success", "dispatched_count": ...}`. Sends WhatsApp advisory messages for next-day planning to all registered farm profiles.
-
----
-
-### Scenario 4: CropDoctor Regulatory Compliance Validation
-Verify that EVERY CropDoctor triage output includes the mandatory ONSSA disclaimer verbatim.
-
-1. Send leaf photo via WhatsApp sandbox or mock webhook endpoint.
-2. Verify reply body contains:
-   > *"This is a first-pass triage only. It does not replace advice from a licensed agronomist or the official product label. Always verify with ONSSA-authorized products."*
-3. For low-confidence photos (<50%), verify reply contains NO chemical/product names.
-
----
-
-### Scenario 5: GCP Cloud Run Deployment (`gcloud CLI`)
-Verify application container deployment via Google Cloud SDK CLI per PRD Section 15.11.
+Deploy backend to GCP Cloud Run per PRD Section 15.11:
 
 ```bash
 gcloud run deploy irrigagent \
   --source . \
   --region europe-west1 \
   --allow-unauthenticated \
-  --set-env-vars WHATSAPP_TOKEN=...,WHATSAPP_PHONE_NUMBER_ID=...,VERIFY_TOKEN=...,GCP_PROJECT_ID=...,JOB_SECRET_TOKEN=...
+  --set-env-vars GCP_PROJECT_ID="irrigagent-prod",WHATSAPP_VERIFY_TOKEN="irrigagent_secret_token_2026",ENABLE_DARIJA_VOICE_TEASER="true"
 ```
-**Expected Outcome**: Cloud Run service deploys successfully and provides public HTTPS callback URL for Meta WhatsApp Cloud API webhooks (`https://<service-url>/webhook`). *(Note: Declarative Terraform IaC migration will occur post-selection under Milestone M6).*

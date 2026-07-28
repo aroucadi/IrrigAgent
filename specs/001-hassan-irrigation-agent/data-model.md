@@ -1,110 +1,116 @@
-# Data Model Specification: Hassan Persona
+# Data Model & Schema Specification: Hassan Persona & Darija Voice Teaser
 
-**Feature**: Hassan Persona - Proactive Irrigation Agent & Leaf Photo Triage  
-**Branch**: `001-hassan-irrigation-agent`  
-**Date**: 2026-07-28
-
----
+**Branch**: `001-hassan-irrigation-agent` | **Date**: 2026-07-28 | **Spec**: [spec.md](spec.md)
 
 ## Firestore Collections
 
-### 1. `farm_profiles`
-Stores farm manager metadata, geographic coordinates, crop profile, and language preferences.
+### 1. `farm_profiles` Collection
+Stores registered farm metadata per WhatsApp phone number.
 
-- **Document ID**: `phone_number` (E.164 string format, e.g. `"+212600000000"`)
-- **Fields**:
-  | Field Name | Type | Description | Validation / Constraints |
-  |---|---|---|---|
-  | `phone_number` | String | E.164 phone number | Primary identifier, required |
-  | `location` | Map | Geo-coordinates | `{ "latitude": Float, "longitude": Float }` |
-  | `crop_type` | String | Crop grown on farm | e.g., `"tomatoes"`, `"citrus"` |
-  | `acreage_hectares` | Float | Farm size in hectares | Positive number (e.g. `10.5`) |
-  | `preferred_language` | String | User preferred language | `"french"` or `"darija"` (Default `"french"`) |
-  | `created_at` | Timestamp | Profile creation date | ISO 8601 UTC timestamp |
-  | `updated_at` | Timestamp | Last updated date | ISO 8601 UTC timestamp |
-
----
-
-### 2. `irrigation_recommendations`
-Stores daily recommendation logs, weather data snapshots, and user approval choices.
-
-- **Document ID**: `rec_{phone_number}_{YYYY-MM-DD}` (e.g. `rec_+212600000000_2026-07-29`)
-- **Fields**:
-  | Field Name | Type | Description | Validation / Constraints |
-  |---|---|---|---|
-  | `recommendation_id` | String | Unique document ID | Required |
-  | `phone_number` | String | Reference to `farm_profiles` | E.164 string |
-  | `target_date` | String | Recommendation date | Format `YYYY-MM-DD` |
-  | `forecast_weather` | Map | Ingested Open-Meteo metrics | `{ "et0": Float, "precipitation_mm": Float, "temp_max_c": Float }` |
-  | `data_quality` | String | Data freshness indicator | `"fresh"` (from API) or `"estimated"` (yesterday fallback) |
-  | `recommended_action` | String | Core decision output | `"approve_standard"`, `"skip_rain"`, `"adjust_water"` |
-  | `recommendation_text` | String | Outgoing WhatsApp message body | Plain text in French or Darija |
-  | `status` | String | Recommendation lifecycle state | `"pending"`, `"approved"`, `"skipped"`, `"modified"`, `"failed"` |
-  | `user_response_raw` | String | Raw text reply from Hassan | e.g., `"1"`, `"2"`, `"3 +10 min at 05:00"` |
-  | `parsed_modification` | Map | Regex-parsed modification payload | `{ "duration_delta_min": Integer, "start_time": String }` |
-  | `dispatched_at` | Timestamp | Message dispatch timestamp | ISO 8601 UTC (Target 19:00 GMT+1) |
-  | `responded_at` | Timestamp | User reply timestamp | Null until user responds |
-
----
-
-### 3. `disease_triage_requests`
-Stores CropDoctor photo triage history, vision diagnostic outputs, and regulatory disclaimer compliance.
-
-- **Document ID**: `triage_{phone_number}_{timestamp}`
-- **Fields**:
-  | Field Name | Type | Description | Validation / Constraints |
-  |---|---|---|---|
-  | `request_id` | String | Unique document ID | Required |
-  | `phone_number` | String | Reference to `farm_profiles` | E.164 string |
-  | `image_id` | String | Meta WhatsApp image media ID | Meta media ID string |
-  | `pathogen_identified` | String | Disease symptom identified | Standard disease key (e.g. `"tuta_absoluta"`, `"leaf_mold"`) |
-  | `confidence_score` | Float | Vision model confidence ratio | Range `0.0` to `1.0` |
-  | `confidence_tier` | String | Categorized confidence level | `"high"` (>=0.75), `"medium"` (0.50-0.74), `"low"` (<0.50) |
-  | `onssa_product_pointer` | String | Matched ONSSA product class | Static table lookup result (null if Low confidence) |
-  | `disclaimer_included` | Boolean | Regulatory compliance flag | MUST be `true` |
-  | `response_text` | String | Final WhatsApp text reply | Includes diagnosis + disclaimer |
-  | `created_at` | Timestamp | Interaction timestamp | ISO 8601 UTC timestamp |
-
----
-
-## Static ONSSA Product Lookup Dictionary (In-Memory Python Module)
-
-```python
-ONSSA_PRODUCT_CATALOG = {
-    "tomatoes": {
-        "tuta_absoluta": "Bacillus thuringiensis / Spinosad (ONSSA authorized class)",
-        "phytophthora_infestans": "Copper hydroxide / Azoxystrobin (ONSSA authorized class)",
-        "alternaria_solani": "Difenoconazole / Mancozeb (ONSSA authorized class)",
-        "powdery_mildew": "Sulfur / Penconazole (ONSSA authorized class)",
-    },
-    "citrus": {
-        "citrus_canker": "Copper oxychloride (ONSSA authorized class)",
-        "citrus_aphids": "Acetamiprid / Pyrethrin (ONSSA authorized class)",
-        "spider_mites": "Abamectin / Hexythiazox (ONSSA authorized class)",
-    }
+```json
+{
+  "user_id": "phone_212600000000",
+  "phone_number": "+212600000000",
+  "location": {
+    "latitude": 30.4278,
+    "longitude": -9.5981,
+    "region": "Souss-Massa, Morocco"
+  },
+  "crop_type": "tomatoes",
+  "acreage_ha": 8.5,
+  "preferred_language": "darija",
+  "created_at": "2026-07-28T14:00:00Z",
+  "updated_at": "2026-07-28T16:00:00Z"
 }
 ```
 
 ---
 
-## 4. Terraform GCP Infrastructure Resources (`infra/`)
+### 2. `irrigation_recommendations` Collection
+Stores daily proactive irrigation advisories and Hassan's responses.
 
-### Module Layout
-```text
-infra/
-├── main.tf          # Core GCP resource definitions (Cloud Run, Firestore, Scheduler, Secret Manager, IAM)
-├── variables.tf     # Configurable variables (project_id, region, image_url, secrets)
-└── outputs.tf       # Exported resource outputs (service_url, service_accounts)
+```json
+{
+  "recommendation_id": "rec_212600000000_20260729",
+  "phone_number": "+212600000000",
+  "target_date": "2026-07-29",
+  "et0_mm": 5.4,
+  "recommended_duration_min": 45,
+  "status": "APPROVED",
+  "data_quality": "FRESH",
+  "response_payload": {
+    "reply_raw": "1",
+    "parsed_modification": null,
+    "received_at": "2026-07-28T19:05:12Z"
+  },
+  "created_at": "2026-07-28T18:45:00Z"
+}
 ```
 
-### Managed Resource Specifications (`infra/main.tf`)
+---
 
-| Resource Type | Resource Name | Purpose | Configuration Highlights |
-|---|---|---|---|
-| `google_cloud_run_v2_service` | `irrigagent_app` | Serverless FastAPI web app container | Image: `gcr.io/{project_id}/irrigagent:latest`, Min 0, Max 5 instances, IAM auth required |
-| `google_firestore_database` | `default` | Firestore Native Mode DB instance | Location: `nam5` / `europe-west1`, Type: `FIRESTORE_NATIVE` |
-| `google_cloud_scheduler_job` | `daily_advisory_trigger` | 18:45 GMT+1 cron trigger | Schedule: `45 17 * * *` (18:45 GMT+1 in UTC), HTTP `POST /jobs/daily-recommendations`, OIDC token auth |
-| `google_secret_manager_secret` | `whatsapp_token`, `verify_token`, `cron_secret` | Secret Manager containers | Automatic replication policy, versioned secrets |
-| `google_service_account` | `cloudrun_sa`, `scheduler_sa` | Dedicated IAM identities | Least-privilege service accounts |
-| `google_project_iam_member` | `cloudrun_firestore`, `cloudrun_secrets`, `scheduler_invoker` | Minimal role bindings | Roles: `roles/datastore.user`, `roles/secretmanager.secretAccessor`, `roles/run.invoker` |
+### 3. `disease_triage_requests` Collection
+Stores CropDoctor multimodal leaf photo triage interactions.
 
+```json
+{
+  "request_id": "triage_212600000000_1722180000",
+  "phone_number": "+212600000000",
+  "image_url": "https://mmg.whatsapp.net/...",
+  "identified_pathogen": "Tomato Yellow Leaf Curl Virus (TYLCV)",
+  "confidence_score": 0.85,
+  "onssa_product_pointer": {
+    "category": "Authorized Insecticides (Whitefly Vector Control)",
+    "active_ingredients": ["Acetamiprid", "Pyriproxyfen"],
+    "verbatim_disclaimer": "This is a first-pass triage only. It does not replace advice from a licensed agronomist or the official product label. Always verify with ONSSA-authorized products."
+  },
+  "created_at": "2026-07-28T15:30:00Z"
+}
+```
+
+---
+
+## Static ONSSA Lookup Schema
+
+Hardcoded static mapping dictionary in `app/cropdoctor.py` (~10–15 common tomato/citrus pathogens to ONSSA authorized classes).
+
+```python
+ONSSA_LOOKUP_TABLE = {
+    "Tomato Late Blight (Phytophthora infestans)": {
+        "class": "Fungicide - Copper / Metalaxyl",
+        "active_ingredients": ["Mancozeb", "Copper Hydroxide"],
+        "onssa_reference": "ONSSA Register Class F-04",
+    },
+    "Tomato Yellow Leaf Curl Virus (TYLCV)": {
+        "class": "Insecticide (Vector Whitefly Control)",
+        "active_ingredients": ["Acetamiprid", "Pyriproxyfen"],
+        "onssa_reference": "ONSSA Register Class I-12",
+    },
+    "Citrus Red Mite (Panonychus citri)": {
+        "class": "Acaricide",
+        "active_ingredients": ["Aquinocel", "Spirodiclofen"],
+        "onssa_reference": "ONSSA Register Class A-02",
+    },
+}
+```
+
+---
+
+## Voice Teaser Audio Payload Schema
+
+In-memory and background task payload for generating Moroccan Darija voice notes.
+
+```json
+{
+  "payload_id": "voice_212600000000_1722180500",
+  "phone_number": "+212600000000",
+  "english_intent": "APPROVED_IRRIGATION_45_MIN",
+  "arabic_script_darija": "مزيان، صافي غدا غادي تسقي 45 دقيقة كيفما متفقين.",
+  "audio_encoding": "OGG_OPUS",
+  "language_code": "ar-MA",
+  "staging_file_path": "/tmp/voice_212600000000_1722180500.ogg",
+  "whatsapp_media_id": "media_9876543210",
+  "latency_ms": 1840,
+  "status": "DELIVERED"
+}
+```

@@ -31,7 +31,7 @@ def test_webhook_verification_failure():
     asyncio.run(_test())
 
 
-def test_webhook_receive_option_1():
+def test_webhook_receive_option_1_approve():
     async def _test():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             payload = {
@@ -53,6 +53,112 @@ def test_webhook_receive_option_1():
             resp = await client.post("/webhook", json=payload)
             assert resp.status_code == 200
             assert resp.json().get("status") == "approved"
+    asyncio.run(_test())
+
+
+def test_webhook_receive_option_2_skip():
+    """Test Option 2 reply ('2') skips tomorrow's irrigation adjustment."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = {
+                "object": "whatsapp_business_account",
+                "entry": [{
+                    "changes": [{
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "messages": [{
+                                "from": "+212600000000",
+                                "id": "wamid_test_2",
+                                "type": "text",
+                                "text": {"body": "2"}
+                            }]
+                        }
+                    }]
+                }]
+            }
+            resp = await client.post("/webhook", json=payload)
+            assert resp.status_code == 200
+            assert resp.json().get("status") == "skipped"
+    asyncio.run(_test())
+
+
+def test_webhook_receive_option_3_modify():
+    """Test Option 3 reply ('3 +10 min at 05:00') parses custom modification."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = {
+                "object": "whatsapp_business_account",
+                "entry": [{
+                    "changes": [{
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "messages": [{
+                                "from": "+212600000000",
+                                "id": "wamid_test_3",
+                                "type": "text",
+                                "text": {"body": "3 +10 min at 05:00"}
+                            }]
+                        }
+                    }]
+                }]
+            }
+            resp = await client.post("/webhook", json=payload)
+            assert resp.status_code == 200
+            assert resp.json().get("status") == "modified"
+    asyncio.run(_test())
+
+
+def test_webhook_receive_profile_command_update():
+    """Test webhook parsing of farm profile update command per FR-018."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = {
+                "object": "whatsapp_business_account",
+                "entry": [{
+                    "changes": [{
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "messages": [{
+                                "from": "+212600000000",
+                                "id": "wamid_test_prof",
+                                "type": "text",
+                                "text": {"body": "update crop citrus"}
+                            }]
+                        }
+                    }]
+                }]
+            }
+            resp = await client.post("/webhook", json=payload)
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data.get("status") == "profile_command_processed"
+            assert data.get("updated_fields") == {"crop_type": "citrus"}
+    asyncio.run(_test())
+
+
+def test_webhook_unrecognized_text_reminder():
+    """Test webhook handling of unrecognized reply sending gentle reminder per FR-019."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = {
+                "object": "whatsapp_business_account",
+                "entry": [{
+                    "changes": [{
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "messages": [{
+                                "from": "+212600000000",
+                                "id": "wamid_test_unrecognized",
+                                "type": "text",
+                                "text": {"body": "random unrecognized message"}
+                            }]
+                        }
+                    }]
+                }]
+            }
+            resp = await client.post("/webhook", json=payload)
+            assert resp.status_code == 200
+            assert resp.json().get("status") == "reminder_sent"
     asyncio.run(_test())
 
 

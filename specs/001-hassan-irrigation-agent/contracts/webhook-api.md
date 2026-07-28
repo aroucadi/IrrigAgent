@@ -1,33 +1,33 @@
-# Interface Contract: WhatsApp Webhook API
+# Webhook API Interface Contract: Meta WhatsApp Cloud API
 
-**Endpoint**: `https://<service-url>/webhook`  
-**Protocol**: HTTPS  
-**Content-Type**: `application/json`
+**Branch**: `001-hassan-irrigation-agent` | **Date**: 2026-07-28 | **Spec**: [spec.md](../spec.md)
 
----
+## Endpoints
 
-## 1. Webhook Handshake (GET `/webhook`)
+### 1. Webhook Verification (`GET /webhook`)
 
-Called by Meta App Dashboard when validating the webhook endpoint URL.
+Meta WhatsApp Cloud API sends a GET request when configuring the webhook URL.
 
-### Request Query Parameters
-| Parameter | Type | Description |
-|---|---|---|
-| `hub.mode` | String | Must equal `"subscribe"` |
-| `hub.verify_token` | String | Verification secret matching `VERIFY_TOKEN` env var |
-| `hub.challenge` | String | Random challenge string sent by Meta |
+**Query Parameters**:
+- `hub.mode`: String, must equal `"subscribe"`
+- `hub.verify_token`: String, matched against local `WHATSAPP_VERIFY_TOKEN`
+- `hub.challenge`: Integer/String, echoed verbatim on successful verification
 
-### Response
-- **200 OK**: Plain text response containing the raw `hub.challenge` string.
-- **403 Forbidden**: Returned if `hub.verify_token` fails to match.
+**Response**:
+- Status `200 OK` with body equal to `hub.challenge` string.
+- Status `403 Forbidden` if verify token mismatch.
 
 ---
 
-## 2. Incoming Webhook Event (POST `/webhook`)
+### 2. Webhook Inbound Message Payload (`POST /webhook`)
 
-Called by Meta every time a verified sandbox user sends a text message or photo image.
+Meta WhatsApp Cloud API sends POST notifications for incoming messages.
 
-### Expected Payload Structure (Text Reply)
+**Headers**:
+- `Content-Type: application/json`
+- `X-Hub-Signature-256: sha256=...` (HMAC verification)
+
+**Text Reply Payload Example (Option 1 Approval)**:
 ```json
 {
   "object": "whatsapp_business_account",
@@ -40,20 +40,15 @@ Called by Meta every time a verified sandbox user sends a text message or photo 
             "messaging_product": "whatsapp",
             "metadata": {
               "display_phone_number": "15550000000",
-              "phone_number_id": "PHONE_NUMBER_ID"
+              "phone_number_id": "123456789"
             },
-            "contacts": [
-              {
-                "profile": { "name": "Hassan" },
-                "wa_id": "212600000000"
-              }
-            ],
+            "contacts": [{"profile": {"name": "Hassan"}, "wa_id": "212600000000"}],
             "messages": [
               {
                 "from": "212600000000",
-                "id": "wamid.HBgLMjEyNjAwMDAwMDAwFQIAERgSQjE2M...",
-                "timestamp": "1774782000",
-                "text": { "body": "1" },
+                "id": "wamid.HBgL...",
+                "timestamp": "1722180000",
+                "text": {"body": "1"},
                 "type": "text"
               }
             ]
@@ -66,33 +61,30 @@ Called by Meta every time a verified sandbox user sends a text message or photo 
 }
 ```
 
-### Expected Payload Structure (Leaf Photo Image)
+**Image Message Payload Example (CropDoctor Triage)**:
 ```json
 {
   "object": "whatsapp_business_account",
   "entry": [
     {
-      "id": "WHATSAPP_BUSINESS_ACCOUNT_ID",
       "changes": [
         {
           "value": {
-            "messaging_product": "whatsapp",
             "messages": [
               {
                 "from": "212600000000",
-                "id": "wamid.HBgLMjEyNjAwMDAwMDAwFQIAERgSQjE2M...",
-                "timestamp": "1774782000",
+                "id": "wamid.HBgL...",
+                "timestamp": "1722180000",
                 "image": {
-                  "caption": "spot on leaf",
+                  "caption": "What disease is this?",
                   "mime_type": "image/jpeg",
                   "sha256": "...",
-                  "id": "MEDIA_ID_12345"
+                  "id": "media_image_123"
                 },
                 "type": "image"
               }
             ]
-          },
-          "field": "messages"
+          }
         }
       ]
     }
@@ -100,5 +92,7 @@ Called by Meta every time a verified sandbox user sends a text message or photo 
 }
 ```
 
-### Response
-- **200 OK**: JSON response `{"status": "ok"}` (Meta requires HTTP 200 within 20s to prevent delivery retries).
+**Synchronous Response**:
+- Status `200 OK` (HTTP body `{"status": "ok"}`) within <1.0s.
+- Text confirmation sent via WhatsApp Cloud API POST `/messages`.
+- If `ENABLE_DARIJA_VOICE_TEASER=true`, an asynchronous task synthesizes audio and calls `/messages` with `"type": "audio"`.

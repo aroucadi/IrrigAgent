@@ -9,6 +9,7 @@ __pycache__/
 htmlcov/
 *.log
 .agent/
+.vscode/
 .terraform/
 *.tfstate
 *.tfstate.*

@@ -1,8 +1,8 @@
-# Specification Quality Checklist: Hassan Persona - Proactive Irrigation Agent & Leaf Photo Triage (Darija Voice Teaser Extension)
+# Specification Quality Checklist: Quality & Security Gate Module
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-28
-**Feature**: [spec.md](file:///d:/rouca/DVM/workPlace/IrrigAgent/specs/001-hassan-irrigation-agent/spec.md)
+**Feature**: [spec.md](file:///d:/rouca/DVM/workPlace/IrrigAgent/specs/002-quality-security-gate/spec.md)
 
 ## Content Quality
 
@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All 16 validation items passed without issue. Spec extension complete and verified.
+- All items passed validation. The specification is ready for planning.
