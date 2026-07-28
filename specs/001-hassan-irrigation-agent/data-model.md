@@ -84,3 +84,27 @@ ONSSA_PRODUCT_CATALOG = {
     }
 }
 ```
+
+---
+
+## 4. Terraform GCP Infrastructure Resources (`infra/`)
+
+### Module Layout
+```text
+infra/
+├── main.tf          # Core GCP resource definitions (Cloud Run, Firestore, Scheduler, Secret Manager, IAM)
+├── variables.tf     # Configurable variables (project_id, region, image_url, secrets)
+└── outputs.tf       # Exported resource outputs (service_url, service_accounts)
+```
+
+### Managed Resource Specifications (`infra/main.tf`)
+
+| Resource Type | Resource Name | Purpose | Configuration Highlights |
+|---|---|---|---|
+| `google_cloud_run_v2_service` | `irrigagent_app` | Serverless FastAPI web app container | Image: `gcr.io/{project_id}/irrigagent:latest`, Min 0, Max 5 instances, IAM auth required |
+| `google_firestore_database` | `default` | Firestore Native Mode DB instance | Location: `nam5` / `europe-west1`, Type: `FIRESTORE_NATIVE` |
+| `google_cloud_scheduler_job` | `daily_advisory_trigger` | 18:45 GMT+1 cron trigger | Schedule: `45 17 * * *` (18:45 GMT+1 in UTC), HTTP `POST /jobs/daily-recommendations`, OIDC token auth |
+| `google_secret_manager_secret` | `whatsapp_token`, `verify_token`, `cron_secret` | Secret Manager containers | Automatic replication policy, versioned secrets |
+| `google_service_account` | `cloudrun_sa`, `scheduler_sa` | Dedicated IAM identities | Least-privilege service accounts |
+| `google_project_iam_member` | `cloudrun_firestore`, `cloudrun_secrets`, `scheduler_invoker` | Minimal role bindings | Roles: `roles/datastore.user`, `roles/secretmanager.secretAccessor`, `roles/run.invoker` |
+

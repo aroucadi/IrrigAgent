@@ -89,3 +89,21 @@ Verify that EVERY CropDoctor triage output includes the mandatory ONSSA disclaim
 2. Verify reply body contains:
    > *"This is a first-pass triage only. It does not replace advice from a licensed agronomist or the official product label. Always verify with ONSSA-authorized products."*
 3. For low-confidence photos (<50%), verify reply contains NO chemical/product names.
+
+---
+
+### Scenario 5: Terraform GCP Infrastructure Validation (`infra/`)
+Verify declarative Infrastructure as Code provisioned without manual GCP Console clicks per Constitution Principle VII.
+
+```bash
+# 1. Initialize Terraform GCP provider
+terraform -chdir=infra init
+
+# 2. Validate configuration syntax
+terraform -chdir=infra validate
+
+# 3. Perform dry-run plan against GCP sandbox project
+terraform -chdir=infra plan -var="project_id=irrigagent-dev" -var="whatsapp_access_token=test" -var="whatsapp_verify_token=test" -var="cron_secret=test"
+```
+**Expected Outcome**: Terraform outputs execution plan detailing creation of `google_cloud_run_v2_service`, `google_firestore_database`, `google_cloud_scheduler_job`, `google_secret_manager_secret`, and `google_service_account` resources with 0 errors.
+

@@ -76,3 +76,25 @@ Use **Google Cloud Firestore** in Native Mode.
   2. `irrigation_recommendations` (keyed by `rec_{phone}_{YYYYMMDD}`)
   3. `disease_triage_requests` (keyed by `triage_{phone}_{timestamp}`)
 - Fast document read/write latency (<20ms).
+
+---
+
+## 6. Infrastructure-as-Code (IaC) & Deployment Architecture
+
+### Decision
+Use **Terraform (HCL v1.5+)** with the HashiCorp Google Provider (`hashicorp/google`) located under an **`infra/`** directory (`main.tf`, `variables.tf`, `outputs.tf`).
+
+### Rationale
+- **100% Constitution Compliance**: Adheres strictly to Constitution Principle VII requiring declarative Infrastructure as Code and zero manual GCP Console clicks.
+- **Resource Scope**:
+  1. `google_cloud_run_v2_service`: Deploys FastAPI container service with autoscaling (min instances 0, max 5).
+  2. `google_firestore_database`: Provisions Firestore Database instance in Native Mode.
+  3. `google_cloud_scheduler_job`: Configures 18:45 GMT+1 cron HTTP trigger pointing to Cloud Run `POST /jobs/daily-recommendations` endpoint with secure OIDC token authentication.
+  4. `google_secret_manager_secret` & `version`: Stores sensitive secrets (`WHATSAPP_TOKEN`, `VERIFY_TOKEN`, `CRON_SECRET`).
+  5. `google_service_account` & `google_project_iam_member`: Creates dedicated service accounts (`irrigagent-cloudrun-sa`, `irrigagent-scheduler-sa`) with least-privilege IAM roles (`roles/datastore.user`, `roles/secretmanager.secretAccessor`, `roles/run.invoker`).
+- **Reproducibility & Drift Prevention**: Enables rapid environment creation (staging, production) via `terraform apply` with zero manual configuration steps.
+
+### Alternatives Considered
+- *Pulumi TypeScript*: Required extra Node.js runtime setup and state backend management; Terraform HCL provides native, zero-dependency GCP provider integration with standard CLI tooling.
+- *Manual GCP Console Setup*: Expressly prohibited by Constitution Principle VII due to lack of reproducibility, auditability, and vulnerability to configuration drift.
+
