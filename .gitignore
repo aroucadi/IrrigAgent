@@ -9,3 +9,7 @@ __pycache__/
 htmlcov/
 *.log
 .agent/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
