@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Specification extended with User Story 5 (GitHub Actions CI/CD Pipeline `.github/workflows/deploy.yml`) and Cloud Scheduler timezone specification (`18:45 Africa/Casablanca`).
+- Consistency check applied: Specification aligned strictly with PRD.md Section 15.11 deployment model (`gcloud run deploy`), with Post-Selection Milestone M6 added for post-pilot Terraform IaC migration.
