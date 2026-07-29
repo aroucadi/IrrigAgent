@@ -42,11 +42,14 @@ def detect_arabizi_or_arabic(text: str) -> bool:
     # Arabic script Unicode range check
     if re.search(r'[\u0600-\u06FF]', text):
         return True
+    # Strip clock-time tokens matching e.g. 07h00, 19h00, 06h30 (\b\d{1,2}h\d{2}\b)
+    cleaned_text = re.sub(r'\b\d{1,2}h\d{2}\b', '', text, flags=re.IGNORECASE)
     # Word-internal Arabizi digit substitutions for Arabic phonemes (e.g. 'm3ak', '7na', '9dim')
     # Excludes standalone choice digits ('3'), time strings ('06h30'), and quantities ('30 min')
-    if re.search(r'\b[a-zA-Z]+[379][a-zA-Z0-9]*\b|\b[a-zA-Z0-9]*[379][a-zA-Z]+\b', text):
+    if re.search(r'\b[a-zA-Z]+[379][a-zA-Z0-9]*\b|\b[a-zA-Z0-9]*[379][a-zA-Z]+\b', cleaned_text):
         return True
     return False
+
 
 
 async def get_farm_profile(phone_number: str) -> Optional[Dict[str, Any]]:
@@ -63,22 +66,26 @@ async def get_farm_profile(phone_number: str) -> Optional[Dict[str, Any]]:
 
 
 async def save_farm_profile(profile_data: Dict[str, Any]) -> Dict[str, Any]:
-    phone_number = profile_data["phone_number"]
-    profile_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    from app.schemas import FarmProfile
+    validated = FarmProfile.model_validate(profile_data)
+    clean_data = validated.model_dump()
+    phone_number = clean_data["phone_number"]
+    clean_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     client = get_firestore_client()
     if client:
         try:
             doc_ref = client.collection("farm_profiles").document(phone_number)
-            await doc_ref.set(profile_data, merge=True)
+            await doc_ref.set(clean_data, merge=True)
         except Exception:
             pass
     
     if phone_number in _IN_MEMORY_FARM_PROFILES:
-        _IN_MEMORY_FARM_PROFILES[phone_number].update(profile_data)
+        _IN_MEMORY_FARM_PROFILES[phone_number].update(clean_data)
     else:
-        profile_data["created_at"] = datetime.now(timezone.utc).isoformat()
-        _IN_MEMORY_FARM_PROFILES[phone_number] = profile_data
+        clean_data["created_at"] = datetime.now(timezone.utc).isoformat()
+        _IN_MEMORY_FARM_PROFILES[phone_number] = clean_data
     return _IN_MEMORY_FARM_PROFILES[phone_number]
+
 
 
 async def list_active_farm_profiles() -> List[Dict[str, Any]]:

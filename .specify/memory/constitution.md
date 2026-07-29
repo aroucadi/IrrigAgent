@@ -1,10 +1,10 @@
 <!--
 ### Sync Impact Report
-- Version change: 1.2.0 → 1.3.0
+- Version change: 1.3.0 → 1.4.0
 - Modified principles:
-  - Added VIII. Quality, Security & Automated Verification Gates (NON-NEGOTIABLE): Enforces zero-broken-tests policy, deterministic calculation & regex parser test coverage, zero secrets in code, mandatory pre-commit hook gates (secret scan, lint, fast tests < 3.0s), and automated verification standards for specifications.
-- Added sections: Core Principles -> VIII. Quality, Security & Automated Verification Gates
-- Removed sections: N/A
+  - Section V (Voice Scope Note): Narrowed voice scope to explicitly allow optional Voice Output (TTS) behind feature flag `ENABLE_DARIJA_VOICE_TEASER=true` after core loop pilot validation, while explicitly keeping Voice Input (transcription/ASR) out of scope.
+- Added sections: None
+- Removed sections: None
 - Templates requiring updates:
   - ✅ .specify/templates/plan-template.md (Constitution Check gates verified)
   - ✅ .specify/templates/spec-template.md (Automated verification acceptance criteria verified)
@@ -38,7 +38,7 @@ The explicit cut list is strictly enforced for v1. The system MUST NOT include:
 - Complex multi-farm scheduling
 - Physical soil sensor hardware integration
 
-*Note on Voice Output*: An opt-in Darija Voice Teaser module using Google Cloud Text-to-Speech (`ar-MA`) is permitted strictly as an asynchronous, non-blocking audio response controlled by feature flag `ENABLE_DARIJA_VOICE_TEASER=true` for incubator demo presentations. Primary text/button execution MUST remain sub-second and fully independent.
+*Note on Voice Scope*: Voice output (TTS acknowledgment of approve/skip/modify) is permitted as an optional, flagged enhancement (`ENABLE_DARIJA_VOICE_TEASER=true`) once the core text loop and CropDoctor features are fully pilot-validated. Voice input (transcription/ASR) remains strictly out of scope for this phase. Primary text/button execution MUST remain sub-second and fully independent.
 
 Any feature request or code addition introducing non-permitted cut list capabilities MUST be rejected or deferred.
 
@@ -81,4 +81,4 @@ All development and feature deliverables MUST satisfy mandatory automated verifi
   - **MINOR**: Addition of new principles, expanded scope boundaries, or governance rules.
   - **PATCH**: Clarifications, formatting, typo corrections, and non-semantic refinements.
 
-**Version**: 1.3.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-28
+**Version**: 1.4.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-29

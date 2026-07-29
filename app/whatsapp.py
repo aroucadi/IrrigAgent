@@ -38,8 +38,9 @@ async def send_text_message(to: str, body: str) -> Dict[str, Any]:
 async def download_media(media_id: str) -> bytes:
     """Retrieve media binary bytes from Meta Graph API using media_id."""
     if _is_mock_token(WHATSAPP_TOKEN) or media_id.startswith("mock_"):
-        # Return dummy 1x1 image bytes for mock testing
-        return b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xFF\xDB\x00C\x00"
+        # Return mock high confidence bytes for unit/integration testing
+        return b"fake_high_confidence"
+
 
     headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
     media_info_url = f"{GRAPH_BASE_URL}/{media_id}"

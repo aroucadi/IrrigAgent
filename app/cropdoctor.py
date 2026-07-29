@@ -61,7 +61,7 @@ async def perform_cropdoctor_triage(
         pathogen_key = "unknown"
         symptom_name_fr = "Leaf discoloration"
         confidence_score = 0.35
-    elif image_bytes == b"fake_high_confidence" or force_confidence is not None or image_bytes.startswith(b"\xFF\xD8\xFF\xE0"):
+    elif image_bytes == b"fake_high_confidence" or force_confidence is not None:
         pathogen_key = "phytophthora_infestans"
         symptom_name_fr = "Mildiou de la tomate (Phytophthora infestans)"
         confidence_score = 0.85 if force_confidence is None else force_confidence

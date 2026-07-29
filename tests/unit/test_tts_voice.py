@@ -28,3 +28,29 @@ def test_synthesize_darija_audio_fallback():
         assert len(audio_bytes) > 0
         assert b"Opus" in audio_bytes or len(audio_bytes) > 20
     asyncio.run(_test())
+
+
+def test_voice_teaser_feature_flag_gating():
+    """Verify ENABLE_DARIJA_VOICE_TEASER feature flag configuration."""
+    from app.config import ENABLE_DARIJA_VOICE_TEASER
+    # Feature flag is boolean and off by default unless ENABLE_DARIJA_VOICE_TEASER=true
+    assert isinstance(ENABLE_DARIJA_VOICE_TEASER, bool)
+
+
+def test_whatsapp_audio_dispatch_pipeline():
+    """Verify end-to-end media upload and audio message dispatch pipeline (upload_media -> send_audio_message)."""
+    async def _test():
+        from app.whatsapp import upload_media, send_audio_message
+        mock_audio_bytes = b"OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00OpusHead"
+        
+        # 1. Upload audio media
+        media_id = await upload_media(mock_audio_bytes, mime_type="audio/ogg; codecs=opus")
+        assert media_id is not None
+        assert len(media_id) > 0
+        
+        # 2. Send audio message using media_id
+        res = await send_audio_message("+212600000000", media_id)
+        assert res.get("messaging_product") == "whatsapp"
+        assert len(res.get("messages", [])) > 0
+    asyncio.run(_test())
+

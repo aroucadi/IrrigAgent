@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
+from typing import Optional, Any
 
 
 class HealthCheckResponse(BaseModel):
@@ -10,11 +10,12 @@ class HealthCheckResponse(BaseModel):
 
 
 class FarmProfile(BaseModel):
-    phone: str
-    region: str
-    crop: str
-    flow_rate_lph: float
-    baseline_minutes: int
+    phone_number: str
+    location: Optional[Any] = Field(default="Agadir")
+    crop_type: str = Field(default="tomatoes")
+    acreage_hectares: float = Field(default=10.0, gt=0)
+    preferred_language: str = Field(default="french")
+
 
 
 class DailyAdvisoryJobResponse(BaseModel):

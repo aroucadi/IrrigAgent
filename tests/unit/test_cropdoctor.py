@@ -74,3 +74,16 @@ def test_cropdoctor_triage_exception_fallback():
         assert result["onssa_product_pointer"] is None
         assert "No plant leaf identified in the photo" in result["response_text"]
     asyncio.run(_test())
+
+
+def test_cropdoctor_triage_real_jpeg_bytes_not_mock():
+    """Verify standard JPEG header magic bytes (\xFF\xD8\xFF\xE0) do not trigger hardcoded mock diagnosis."""
+    async def _test():
+        real_jpeg_header = b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00"
+        result = await perform_cropdoctor_triage(real_jpeg_header, "tomatoes")
+        
+        # Should not return hardcoded phytophthora_infestans 0.85 mock diagnosis; falls back cleanly when Gemini client is unconfigured
+        assert result["is_unreadable"] is True
+        assert result["confidence_score"] == 0.0
+    asyncio.run(_test())
+
