@@ -27,7 +27,8 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 - **Confidence-Tiered Safety Rules**:
   - *High / Medium Confidence (>=50%)*: Primary diagnosis + ONSSA product pointer + mandatory disclaimer.
   - *Low Confidence (<50%)*: Cautious observation + request for clearer photo + mandatory disclaimer (**NO chemical or product names provided**).
-- **Constrained Product Recommendations**: Product names are retrieved exclusively from a static, human-verified lookup table strictly scoped to pilot crops (tomatoes, citrus). The model can identify a likely pathogen from a constrained list, but cannot generate, fabricate, or substitute a treatment recommendation for an unsupported crop. (Note: Self-reported model confidence scores are uncalibrated self-reports and serve solely as internal heuristic thresholds).
+- **Constrained Product Recommendations**: Product recommendations are retrieved from the official ONSSA phytosanitary registry dataset (`data/onssa_registry.json` generated via offline sync tooling), with a static human-verified fallback catalog (`ONSSA_STATIC_CATALOG`) if the dataset file is absent. The model can identify a likely pathogen from a constrained list, but cannot generate, fabricate, or substitute a treatment recommendation for an unsupported crop. (Note: Self-reported model confidence scores are uncalibrated self-reports and serve solely as internal heuristic thresholds).
+- **Offline ONSSA Phytosanitary Registry Sync Tool**: Standalone CLI & importable Python module (`scripts/sync_onssa_registry.py`) that extracts Morocco's official ONSSA catalog (~4,700+ entries across ~470 pagination pages) into a structured local dataset, respecting site `robots.txt`, enforcing a 2.5s politeness delay, handling ASP.NET WebForms session postbacks, and supporting dry-runs, exponential retries, and checkpoint progress resilience.
 
 - **Mandatory ONSSA Regulatory Disclaimer**: Every response appends:
   > *"This is a first-pass triage only. It does not replace advice from a licensed agronomist or the official product label. Always verify with ONSSA-authorized products."*
@@ -37,7 +38,7 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 - **WhatsApp Audio Delivery**: Transmits native OGG/OPUS audio messages via Meta Graph API media upload endpoint.
 
 ### 🛡️ Quality & Security Gate Module
-- **Automated Pre-Commit Hooks**: 3-stage local verification gate enforcing Secret Scanning (Meta tokens, GCP keys, Firestore credentials), Code Linting & Formatting (`ruff`, `black`), and Fast Unit Tests (`pytest tests/` with 40/40 100% pass rate under 3 seconds).
+- **Automated Pre-Commit Hooks**: 3-stage local verification gate enforcing Secret Scanning (Meta tokens, GCP keys, Firestore credentials), Code Linting & Formatting (`ruff`, `black`), and Fast Unit Tests (`pytest tests/` with 100% pass rate under 3 seconds).
 - **Cross-Platform Scripting**: Dual POSIX shell (`.sh`) and Windows PowerShell (`.ps1`) scripts for 1-command developer setup and execution.
 
 ---
@@ -55,13 +56,17 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
                             ▼               ▼               ▼
                     [ Open-Meteo ]  [ Gemini 1.5 Flash ] [ Cloud TTS ]
                     (Weather / ET₀) (Leaf Photo Triage) (Darija Voice)
+                                            │
+                                            ▼
+                                [ ONSSA Registry Sync ]
+                                (Offline Data Extractor)
 ```
 
 - **Messaging**: Meta WhatsApp Cloud API (v20.0 Sandbox Mode)
 - **Backend**: Python 3.11+, FastAPI web service
 - **AI Vision**: Gemini 1.5 Flash via Vertex AI
 - **Audio Output**: Google Cloud Text-to-Speech (`ar-MA` Moroccan Arabic, OGG/OPUS)
-- **Data & Storage**: Google Cloud Firestore (Native Mode)
+- **Data & Storage**: Google Cloud Firestore (Native Mode) + Local ONSSA Registry Dataset JSON
 - **Infrastructure as Code (IaC)**: Modular Terraform HCL under `infra/` (`main.tf`, `variables.tf`, `outputs.tf`, `cloud_run.tf`, `secrets.tf`, `scheduler.tf` set to **18:45 Africa/Casablanca**)
 - **Automated CI/CD**: GitHub Actions deployment workflow ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) automating Docker build/push to GCP Artifact Registry and non-interactive `terraform apply`
 
@@ -99,6 +104,14 @@ This project is built following GitHub's [spec-kit](https://github.com/github/sp
 - **Tasks (Completed)**: [specs/004-fix-critical-bugs-and-gaps/tasks.md](specs/004-fix-critical-bugs-and-gaps/tasks.md)
 - **Research & Decisions**: [specs/004-fix-critical-bugs-and-gaps/research.md](specs/004-fix-critical-bugs-and-gaps/research.md)
 - **Quickstart & Verification**: [specs/004-fix-critical-bugs-and-gaps/quickstart.md](specs/004-fix-critical-bugs-and-gaps/quickstart.md)
+
+#### Feature 005: ONSSA Phytosanitary Registry Sync Tool (`005-onssa-registry-sync`)
+- **Specification**: [specs/005-onssa-registry-sync/spec.md](specs/005-onssa-registry-sync/spec.md)
+- **Implementation Plan**: [specs/005-onssa-registry-sync/plan.md](specs/005-onssa-registry-sync/plan.md)
+- **Tasks (Completed)**: [specs/005-onssa-registry-sync/tasks.md](specs/005-onssa-registry-sync/tasks.md)
+- **Research & Decisions**: [specs/005-onssa-registry-sync/research.md](specs/005-onssa-registry-sync/research.md)
+- **Quickstart & Verification**: [specs/005-onssa-registry-sync/quickstart.md](specs/005-onssa-registry-sync/quickstart.md)
+
 
 ---
 
