@@ -58,26 +58,28 @@ async def download_media(media_id: str) -> bytes:
 
 
 def extract_incoming_message(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Extract sender number, text body, and image ID from Meta webhook POST payload."""
+    """Extract sender number, text body, image ID, or location attachment from Meta webhook POST payload."""
     try:
         entry = payload["entry"][0]
         change = entry["changes"][0]["value"]
         messages = change.get("messages")
         if not messages:
             return None  # Status callback, not a user message
-        
+
         msg = messages[0]
         msg_type = msg.get("type")
-        
+
         sender = msg.get("from")
         text_body = msg.get("text", {}).get("body") if msg_type == "text" else None
         image_id = msg.get("image", {}).get("id") if msg_type == "image" else None
-        
+        location_data = msg.get("location") if msg_type == "location" else None
+
         return {
             "from": sender,
             "type": msg_type,
             "text": text_body,
             "image_id": image_id,
+            "location": location_data,
             "message_id": msg.get("id"),
         }
     except (KeyError, IndexError, AttributeError):
@@ -122,3 +124,30 @@ async def send_audio_message(to: str, media_id: str) -> Dict[str, Any]:
         resp = await client.post(MESSAGES_URL, headers=headers, json=payload)
         resp.raise_for_status()
         return resp.json()
+
+
+async def send_image_message(to: str, media_id: str, caption: Optional[str] = None) -> Dict[str, Any]:
+    """Send an image message via WhatsApp Cloud API using media_id and optional text caption."""
+    if _is_mock_token(WHATSAPP_TOKEN) or media_id.startswith("mock_"):
+        return {"messaging_product": "whatsapp", "contacts": [{"wa_id": to}], "messages": [{"id": "mock_wamid_img_789"}]}
+
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    image_payload: Dict[str, Any] = {"id": media_id}
+    if caption:
+        image_payload["caption"] = caption
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": "image",
+        "image": image_payload,
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(MESSAGES_URL, headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json()
+

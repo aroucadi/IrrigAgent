@@ -46,3 +46,31 @@ def parse_modification_text(text: str) -> Tuple[Dict[str, Any], str]:
         ack_msg = "Noted, thank you. Your modification request has been recorded."
 
     return parsed, ack_msg
+
+
+def is_parcel_start_command(text: str) -> bool:
+    if not text:
+        return False
+    raw = text.strip().lower()
+    return bool(re.search(r'^(?:/parcel|/boundary|add boundary)$', raw))
+
+
+def is_parcel_done_command(text: str) -> bool:
+    if not text:
+        return False
+    raw = text.strip().lower()
+    return bool(re.search(r'^(?:done|finish|fin)$', raw))
+
+
+def is_parcel_cancel_command(text: str) -> bool:
+    if not text:
+        return False
+    raw = text.strip().lower()
+    return bool(re.search(r'^(?:/cancel|/reset|cancel)$', raw))
+
+
+def is_heatmap_command(text: str) -> bool:
+    if not text:
+        return False
+    raw = text.strip().lower()
+    return bool(re.search(r'^(?:/heatmap|heatmap|/sentinel|canopy map|canopy)$', raw))

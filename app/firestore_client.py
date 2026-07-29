@@ -18,6 +18,8 @@ _IN_MEMORY_FARM_PROFILES: Dict[str, Dict[str, Any]] = {
 }
 _IN_MEMORY_RECOMMENDATIONS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_TRIAGE_REQUESTS: Dict[str, Dict[str, Any]] = {}
+_IN_MEMORY_PIN_SESSIONS: Dict[str, Dict[str, Any]] = {}
+_IN_MEMORY_FARM_PARCELS: Dict[str, Dict[str, Any]] = {}
 
 _db_client = None
 
@@ -239,3 +241,66 @@ def parse_profile_command(text: str, profile: Dict[str, Any]) -> Tuple[bool, Opt
         return True, None, fallback
 
     return False, None, ""
+
+
+async def save_pin_session(session_data: Dict[str, Any]) -> Dict[str, Any]:
+    phone_number = session_data["phone_number"]
+    session_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_sessions").document(phone_number)
+            await doc_ref.set(session_data, merge=True)
+        except Exception:
+            pass
+    _IN_MEMORY_PIN_SESSIONS[phone_number] = session_data
+    return session_data
+
+
+async def get_pin_session(phone_number: str) -> Optional[Dict[str, Any]]:
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_sessions").document(phone_number)
+            doc = await doc_ref.get()
+            if doc.exists:
+                return doc.to_dict()
+        except Exception:
+            pass
+    return _IN_MEMORY_PIN_SESSIONS.get(phone_number)
+
+
+async def delete_pin_session(phone_number: str) -> None:
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_sessions").document(phone_number)
+            await doc_ref.delete()
+        except Exception:
+            pass
+    _IN_MEMORY_PIN_SESSIONS.pop(phone_number, None)
+
+
+async def save_farm_parcel(phone_number: str, parcel_data: Dict[str, Any]) -> Dict[str, Any]:
+    parcel_record = {
+        "parcel": parcel_data,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_profiles").document(phone_number)
+            await doc_ref.set(parcel_record, merge=True)
+        except Exception:
+            pass
+    if phone_number in _IN_MEMORY_FARM_PROFILES:
+        _IN_MEMORY_FARM_PROFILES[phone_number]["parcel"] = parcel_data
+    _IN_MEMORY_FARM_PARCELS[phone_number] = parcel_data
+    return parcel_data
+
+
+async def get_farm_parcel(phone_number: str) -> Optional[Dict[str, Any]]:
+    profile = await get_farm_profile(phone_number)
+    if profile and "parcel" in profile:
+        return profile["parcel"]
+    return _IN_MEMORY_FARM_PARCELS.get(phone_number)

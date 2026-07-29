@@ -95,3 +95,53 @@ class WebhookVerification(BaseModel):
     hub_verify_token: str = Field(..., alias="hub.verify_token")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class SessionState(str, Enum):
+    IDLE = "IDLE"
+    COLLECTING_PINS = "COLLECTING_PINS"
+    VALIDATING = "VALIDATING"
+
+
+class LocationPin(BaseModel):
+    latitude: float
+    longitude: float
+    timestamp: Optional[str] = None
+
+
+class PinCollectionSession(BaseModel):
+    phone_number: str
+    state: SessionState = SessionState.IDLE
+    pins: list[LocationPin] = Field(default_factory=list)
+    started_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ParcelBoundary(BaseModel):
+    type: str = "Polygon"
+    coordinates: list[list[list[float]]]
+    area_hectares: float
+    perimeter_m: Optional[float] = None
+    updated_at: Optional[str] = None
+
+
+class SentinelScene(BaseModel):
+    scene_id: str
+    acquisition_date: str
+    cloud_cover_percentage: float
+    bbox: list[float]
+    bands: Optional[dict[str, Any]] = None
+
+
+class CanopyHealthReport(BaseModel):
+    parcel_area_ha: float
+    crop_type: str = "Tomatoes"
+    capture_date: str
+    cloud_cover_percent: float = 0.0
+    ndvi_mean: float
+    healthy_percent: float
+    moderate_percent: float
+    stressed_percent: float
+    recommendation: str
+    media_id: Optional[str] = None
+    image_bytes: Optional[bytes] = None

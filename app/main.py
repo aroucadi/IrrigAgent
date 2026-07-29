@@ -4,13 +4,28 @@ from typing import Optional
 
 
 from app.config import VERIFY_TOKEN, JOB_SECRET_TOKEN, ENABLE_DARIJA_VOICE_TEASER
-from app.whatsapp import send_text_message, send_audio_message, upload_media, extract_incoming_message, download_media
+from app.whatsapp import (
+    send_text_message,
+    send_audio_message,
+    send_image_message,
+    upload_media,
+    extract_incoming_message,
+    download_media,
+)
 from app.weather import get_et0_forecast
 from app.decision import evaluate_irrigation_recommendation
-from app.regex_parser import parse_modification_text
+from app.regex_parser import (
+    parse_modification_text,
+    is_parcel_start_command,
+    is_parcel_done_command,
+    is_parcel_cancel_command,
+    is_heatmap_command,
+)
 from app.cropdoctor import perform_cropdoctor_triage
 from app.image_prefilter import validate_image_quality
 from app.tts_voice import synthesize_darija_audio
+from app.parcel_validation import validate_parcel_polygon
+from app.sentinel import generate_canopy_report
 from app.firestore_client import (
     get_farm_profile,
     save_farm_profile,
@@ -20,6 +35,11 @@ from app.firestore_client import (
     save_triage_request,
     detect_arabizi_or_arabic,
     parse_profile_command,
+    save_pin_session,
+    get_pin_session,
+    delete_pin_session,
+    save_farm_parcel,
+    get_farm_parcel,
 )
 
 from app.schemas import (
@@ -28,6 +48,9 @@ from app.schemas import (
     DailyAdvisoryJobResponse,
     WebhookVerification,
     QualityCheckResult,
+    PinCollectionSession,
+    ParcelBoundary,
+    CanopyHealthReport,
 )
 
 app = FastAPI(title="IrrigAgent AI", version="1.0.0")
@@ -114,7 +137,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
             await save_farm_profile(profile)
 
     # First interaction for a new user: Dual-language initial greeting
-    if is_new_user and text and text not in ["1", "2", "3"]:
+    if is_new_user and text and text not in ["1", "2", "3"] and not is_parcel_start_command(text) and not is_heatmap_command(text):
         greeting_msg = (
             "🌾 *Bienvenue sur IrrigAgent AI / Marhaba bik fe IrrigAgent AI!*\n\n"
             "Je suis votre assistant d'irrigation et de santé des cultures.\n"
@@ -124,7 +147,97 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         await send_text_message(sender, greeting_msg)
         return {"status": "welcomed"}
 
-    # 1. Handle Leaf Photo Image Event (CropDoctor)
+    # 1. Handle WhatsApp Location Attachment Event (Pin Collection)
+    if msg_type == "location":
+        loc_data = incoming.get("location") or {}
+        lat = loc_data.get("latitude")
+        lon = loc_data.get("longitude")
+        if lat is not None and lon is not None:
+            session = await get_pin_session(sender)
+            if session and session.get("state") == "COLLECTING_PINS":
+                pins = session.get("pins", [])
+                pins.append({"lat": float(lat), "lon": float(lon)})
+                session["pins"] = pins
+                pin_count = len(pins)
+                await save_pin_session(session)
+
+                if pin_count < 3:
+                    reply = f"✅ Pin {pin_count} recorded! Now send PIN {pin_count + 1} (Corner {pin_count + 1})"
+                else:
+                    reply = f"✅ Pin {pin_count} recorded! Send PIN {pin_count + 1} or reply 'DONE' to close parcel boundary."
+
+                await send_text_message(sender, reply)
+                return {"status": "pin_recorded", "pin_count": pin_count}
+            else:
+                reply = "📍 Location pin received. Send /parcel or 'add boundary' to start defining your farm parcel corners."
+                await send_text_message(sender, reply)
+                return {"status": "location_received_idle"}
+
+    # 2. Check for Pin State Machine Text Commands (/parcel, /cancel, DONE, /heatmap)
+    if is_parcel_start_command(text):
+        new_session = {
+            "phone_number": sender,
+            "state": "COLLECTING_PINS",
+            "pins": [],
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await save_pin_session(new_session)
+        reply = "📍 Send PIN 1 (Corner 1 of your field)"
+        await send_text_message(sender, reply)
+        return {"status": "pin_collection_started"}
+
+    if is_parcel_cancel_command(text):
+        await delete_pin_session(sender)
+        reply = "Cancelled pin collection session."
+        await send_text_message(sender, reply)
+        return {"status": "pin_collection_cancelled"}
+
+    if is_parcel_done_command(text):
+        session = await get_pin_session(sender)
+        if not session or session.get("state") != "COLLECTING_PINS":
+            reply = "No active pin collection session found. Send /parcel to start defining your field corners."
+            await send_text_message(sender, reply)
+            return {"status": "no_active_pin_session"}
+
+        pins = session.get("pins", [])
+        is_valid, err_msg, geojson_parcel = validate_parcel_polygon(pins)
+        if not is_valid:
+            reply = f"❌ Invalid boundary: {err_msg}"
+            await send_text_message(sender, reply)
+            return {"status": "parcel_validation_failed", "error": err_msg}
+
+        await save_farm_parcel(sender, geojson_parcel)
+        await delete_pin_session(sender)
+        reply = (
+            f"🎉 Field boundary recorded successfully!\n"
+            f"Area: {geojson_parcel['area_hectares']} hectares\n"
+            f"Corners: {len(pins)} points\n\n"
+            f"Send /heatmap anytime to generate a Sentinel-2 Canopy Health Map."
+        )
+        await send_text_message(sender, reply)
+        return {"status": "parcel_registered", "area_hectares": geojson_parcel["area_hectares"]}
+
+    if is_heatmap_command(text):
+        parcel = await get_farm_parcel(sender)
+        if not parcel:
+            reply = "📍 No registered field boundary found. Please send /parcel to define your field corners first."
+            await send_text_message(sender, reply)
+            return {"status": "no_parcel_found"}
+
+        crop_type = profile.get("crop_type", "Tomatoes")
+        report = generate_canopy_report(sender, parcel, farm_name="Hassan Farm", crop_type=crop_type)
+        media_id = await upload_media(report.image_bytes, mime_type="image/png", filename="sentinel_heatmap.png")
+
+        caption = (
+            f"🛰️ Sentinel-2 Canopy Health Map (Captured {report.capture_date})\n\n"
+            f"Field Area: {report.parcel_area_ha} hectares ({report.crop_type})\n"
+            f"{report.recommendation}"
+        )
+
+        await send_image_message(sender, media_id, caption=caption)
+        return {"status": "heatmap_dispatched", "media_id": media_id}
+
+    # 3. Handle Leaf Photo Image Event (CropDoctor)
     if msg_type == "image" or image_id:
         try:
             image_bytes = await download_media(image_id or "mock_img_1")
@@ -159,7 +272,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
             await send_text_message(sender, error_msg)
             return {"status": "triage_error", "error": str(e)}
 
-    # 2. Check for Profile View / Update Commands (FR-018)
+    # 4. Check for Profile View / Update Commands (FR-018)
     is_prof_cmd, updated_fields, prof_msg = parse_profile_command(text, profile)
     if is_prof_cmd:
         if updated_fields:
@@ -168,7 +281,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         await send_text_message(sender, prof_msg)
         return {"status": "profile_command_processed", "updated_fields": updated_fields}
 
-    # 3. Handle Text One-Tap Replies (1 = Approve, 2 = Skip, 3 = Modify)
+    # 5. Handle Text One-Tap Replies (1 = Approve, 2 = Skip, 3 = Modify)
     latest_rec = await get_latest_recommendation_for_user(sender)
     
     if text == "1":
