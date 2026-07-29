@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
-from fastapi import FastAPI, Request, Response, Query, Header, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Request, Response, Query, Header, HTTPException, BackgroundTasks, UploadFile, File
 from typing import Optional
+
 
 from app.config import VERIFY_TOKEN, JOB_SECRET_TOKEN, ENABLE_DARIJA_VOICE_TEASER
 from app.whatsapp import send_text_message, send_audio_message, upload_media, extract_incoming_message, download_media
@@ -8,6 +9,7 @@ from app.weather import get_et0_forecast
 from app.decision import evaluate_irrigation_recommendation
 from app.regex_parser import parse_modification_text
 from app.cropdoctor import perform_cropdoctor_triage
+from app.image_prefilter import validate_image_quality
 from app.tts_voice import synthesize_darija_audio
 from app.firestore_client import (
     get_farm_profile,
@@ -25,9 +27,18 @@ from app.schemas import (
     FarmProfile,
     DailyAdvisoryJobResponse,
     WebhookVerification,
+    QualityCheckResult,
 )
 
 app = FastAPI(title="IrrigAgent AI", version="1.0.0")
+
+
+@app.post("/cropdoctor/prefilter", response_model=QualityCheckResult)
+async def prefilter_image_endpoint(file: UploadFile = File(...)):
+    """Standalone endpoint for pre-filtering crop leaf image quality using OpenCV heuristics."""
+    image_bytes = await file.read()
+    return validate_image_quality(image_bytes)
+
 
 
 async def dispatch_darija_voice_teaser(phone: str, text_intent: str):

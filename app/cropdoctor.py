@@ -84,6 +84,9 @@ def lookup_onssa_product(crop_type: str, pathogen_key: str) -> Optional[str]:
 
 
 
+from app.image_prefilter import validate_image_quality
+
+
 async def perform_cropdoctor_triage(
     image_bytes: bytes,
     crop_type: str = "tomatoes",
@@ -93,7 +96,7 @@ async def perform_cropdoctor_triage(
     """Analyze leaf photo via Gemini 1.5 Flash vision (or mock fallback) and return diagnostic response payload."""
     
     # Check for explicit unreadable image flag or dummy byte signature
-    if force_unreadable or image_bytes == b"unreadable_image" or image_bytes == b"non_plant":
+    if force_unreadable or image_bytes in (b"unreadable_image", b"non_plant"):
         return {
             "pathogen_identified": "unreadable",
             "symptom_name": None,
@@ -122,7 +125,24 @@ async def perform_cropdoctor_triage(
         symptom_name_fr = "Mildiou de la tomate (Phytophthora infestans)"
         confidence_score = 0.85 if force_confidence is None else force_confidence
     else:
+        # Run OpenCV Heuristic Pre-Filter Quality Check
+        quality_result = validate_image_quality(image_bytes)
+        if not quality_result.is_acceptable:
+            return {
+                "pathogen_identified": "unreadable",
+                "symptom_name": None,
+                "confidence_score": 0.0,
+                "confidence_tier": None,
+                "onssa_product_pointer": None,
+                "disclaimer_included": False,
+                "is_unreadable": True,
+                "response_text": quality_result.user_feedback_text,
+                "prefilter_defect": quality_result.defect_reason.value,
+                "prefilter_metrics": quality_result.metrics.model_dump() if quality_result.metrics else None,
+            }
+
         # Try real Gemini 1.5 Flash vision call
+
         try:
             import importlib
             genai = importlib.import_module("google.genai")
