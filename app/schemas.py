@@ -15,6 +15,28 @@ class FarmProfile(BaseModel):
     crop_type: str = Field(default="tomatoes")
     acreage_hectares: float = Field(default=10.0, gt=0)
     preferred_language: str = Field(default="french")
+    planting_date: Optional[str] = None
+    is_mature_orchard: bool = False
+
+
+class FAO56CropEntry(BaseModel):
+    crop_type: str
+    display_name: str
+    kc_ini: float
+    kc_mid: float
+    kc_end: float
+    stage_lengths_days: dict[str, int]
+    is_perennial: bool = False
+
+
+class ETcCalculationResult(BaseModel):
+    et0_mm: float
+    kc_applied: float
+    etc_mm: float
+    growth_stage: str
+    days_since_planting: Optional[int] = None
+    notice: Optional[str] = None
+
 
 
 

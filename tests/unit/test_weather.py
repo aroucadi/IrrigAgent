@@ -19,8 +19,8 @@ def test_weather_fallback_after_3_retries_and_notice():
             assert weather_data["et0"] == 4.5
             
             # 2. Evaluate recommendation with fallback quality
-            action, rec_msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather_data, data_quality)
-            
+            action, rec_msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather_data, data_quality=data_quality)
+
             # 3. Assert outgoing message explicitly contains estimated data notice per FR-020
             assert "Estimated ET₀ data used" in rec_msg
     asyncio.run(_test())

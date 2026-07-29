@@ -237,13 +237,17 @@ async def trigger_daily_recommendations(
         loc = profile.get("location", {"latitude": 30.4278, "longitude": -9.5981})
         crop = profile.get("crop_type", "tomatoes")
         acreage = profile.get("acreage_hectares", 10.0)
+        planting_date = profile.get("planting_date")
+        is_mature_orchard = profile.get("is_mature_orchard", False)
 
         # 1. Fetch weather with 3 short-backoff retries
         weather_data, data_quality = await get_et0_forecast(loc["latitude"], loc["longitude"])
         quality_summary[data_quality] += 1
 
         # 2. Evaluate recommendation logic
-        action, rec_msg = evaluate_irrigation_recommendation(crop, acreage, weather_data, data_quality)
+        action, rec_msg = evaluate_irrigation_recommendation(
+            crop, acreage, weather_data, planting_date=planting_date, is_mature_orchard=is_mature_orchard, data_quality=data_quality
+        )
 
         # 3. Store recommendation record
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
