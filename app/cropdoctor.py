@@ -24,8 +24,11 @@ ONSSA_STATIC_CATALOG: Dict[str, Dict[str, str]] = {
 
 def lookup_onssa_product(crop_type: str, pathogen_key: str) -> Optional[str]:
     """Retrieve ONSSA authorized product class from static lookup table."""
-    crop_catalog = ONSSA_STATIC_CATALOG.get(crop_type.lower(), ONSSA_STATIC_CATALOG["tomatoes"])
+    crop_catalog = ONSSA_STATIC_CATALOG.get(crop_type.lower())
+    if not crop_catalog:
+        return None
     return crop_catalog.get(pathogen_key.lower())
+
 
 
 async def perform_cropdoctor_triage(

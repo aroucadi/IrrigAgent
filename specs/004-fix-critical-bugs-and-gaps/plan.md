@@ -6,7 +6,7 @@
 
 ## Summary
 
-Fix the CropDoctor JPEG signature mock-detection collision, refine Arabizi regex tokenization to ignore clock-time strings (`\dh\d`), align `FarmProfile` Pydantic schema validation with actual profile fields, and enforce Constitution v1.4.0 voice output governance rules (gated behind `ENABLE_DARIJA_VOICE_TEASER=true` and sequenced after core text loop validation).
+Fix the CropDoctor JPEG signature mock-detection collision, eliminate silent crop catalog fallback to tomatoes for unsupported crops (`olives`, `wheat`), refine Arabizi regex tokenization to ignore clock-time strings (`\dh\d`), align `FarmProfile` Pydantic schema validation with actual profile fields, update `README.md` safety claims, and enforce Constitution v1.4.0 voice output governance rules (gated behind `ENABLE_DARIJA_VOICE_TEASER=true` and sequenced after core text loop validation).
 
 ## Technical Context
 
@@ -55,7 +55,7 @@ specs/004-fix-critical-bugs-and-gaps/
 ```text
 app/
 ├── main.py              # Webhook entrypoint & routing
-├── cropdoctor.py        # Gemini AI vision triage module
+├── cropdoctor.py        # Gemini AI vision triage module (strict ONSSA catalog lookup)
 ├── schemas.py           # Pydantic data validation models (FarmProfile)
 ├── firestore_client.py  # Firestore persistence & Arabizi language detection
 ├── tts_voice.py         # Google Cloud TTS voice teaser module
@@ -71,6 +71,7 @@ tests/
     ├── test_decision.py
     ├── test_firestore_client.py
     ├── test_regex_parser.py
+    ├── test_schemas.py
     ├── test_tts_voice.py
     └── test_weather.py
 ```

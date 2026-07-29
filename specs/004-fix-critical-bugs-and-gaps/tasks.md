@@ -7,7 +7,7 @@
 ## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: User story mapping ([US1], [US2], [US3], [US4])
+- **[Story]**: User story mapping ([US1], [US2], [US3], [US4], [US5])
 - File paths are exact and project-relative (`app/`, `tests/`)
 
 ---
@@ -89,12 +89,28 @@
 
 ---
 
-## Phase 7: Polish & Verification
+## Phase 7: User Story 5 - Strict Crop Catalog Fallback Elimination & Accurate Safety Claims (Priority: P1)
+
+**Goal**: Remove silent fallback to tomatoes for unsupported crops in `lookup_onssa_product()` and refine README safety claim text to accurately scope pilot crop lookup guarantees.
+
+**Independent Test**: Execute `pytest tests/unit/test_cropdoctor.py -k test_unsupported_crop` and verify triage for `crop_type="olives"` returns `onssa_product_pointer: None` across all confidence tiers.
+
+### Implementation for User Story 5
+
+- [x] T012 [US5] Update `lookup_onssa_product()` in `app/cropdoctor.py` to return `None` when `crop_type` is not present in `ONSSA_STATIC_CATALOG` (removing the `, ONSSA_STATIC_CATALOG["tomatoes"]` fallback).
+- [x] T013 [P] [US5] Add unit test `test_cropdoctor_triage_unsupported_crop_type` in `tests/unit/test_cropdoctor.py` asserting that requests with `crop_type="olives"` return `onssa_product_pointer: None` and general retailer advice.
+- [x] T014 [P] [US5] Update `README.md` safety claim section to state product names are strictly retrieved from a static lookup table scoped to pilot crops (tomatoes, citrus) and note that model confidence scores are uncalibrated self-reports.
+
+**Checkpoint**: User Story 5 complete — unsupported crops fail closed without tomato chemical substitutions, and README safety claims are accurate.
+
+---
+
+## Phase 8: Polish & Verification
 
 **Purpose**: End-to-end test execution and quality gate validation
 
-- [x] T012 Run full test suite `.venv\Scripts\python.exe -m pytest tests/` to confirm 100% pass rate with zero errors and zero warnings.
-- [x] T013 [P] Verify pre-commit hook gate execution and git status cleanliness.
+- [x] T015 Run full test suite `.venv\Scripts\python.exe -m pytest tests/` to confirm 100% pass rate with zero errors and zero warnings.
+- [x] T016 [P] Verify pre-commit hook gate execution and git status cleanliness.
 
 ---
 
@@ -102,19 +118,15 @@
 
 ### Phase Dependencies
 
-- **Setup & Foundational (Phases 1-2)**: No dependencies — execute first.
-- **User Story 1 (P1)**: Depends on Phase 2 completion (MVP).
-- **User Story 2 (P2)**: Depends on Phase 2 completion.
-- **User Story 3 (P2)**: Depends on Phase 2 completion.
-- **User Story 4 (P3)**: Sequenced after core text loop validation per Constitution v1.4.0.
-- **Polish (Phase 7)**: Depends on completion of all user story tasks.
+- **Setup & Foundational (Phases 1-2)**: Complete.
+- **User Stories 1-4 (Phases 3-6)**: Complete.
+- **User Story 5 (Phase 7)**: Complete.
+- **Polish (Phase 8)**: Complete.
 
 ### Parallel Opportunities
 
-- T004 [US1] unit test update can be developed alongside T003.
-- T006 [US2] unit test additions can run alongside T005.
-- T007 [US3] `FarmProfile` model updates and T009 test creation can run in parallel.
-- T011 [US4] voice media dispatch test can run in parallel with T010.
+- T013 [US5] unit test addition can run in parallel with T012 code change.
+- T014 [US5] README documentation update can run in parallel with code tasks.
 
 ---
 
@@ -123,8 +135,7 @@
 ### MVP First (User Story 1 Only)
 1. Complete Phases 1 & 2.
 2. Complete Phase 3 (US1: CropDoctor JPEG magic byte fix).
-3. Validate US1 via `pytest tests/unit/test_cropdoctor.py`.
 
 ### Full Feature Delivery
-1. Complete US1 → US2 → US3 → US4 sequentially.
-2. Execute full validation suite in Phase 7.
+1. Complete US1 → US2 → US3 → US4 → US5.
+2. Execute full validation suite in Phase 8.

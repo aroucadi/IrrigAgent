@@ -15,9 +15,6 @@ Scope mock detection strictly to:
 2. Environment test flag or mock header pass-through (`force_confidence is not None`).
 Remove the generic JPEG magic bytes check `startswith(b"\xFF\xD8\xFF\xE0")`.
 
-### Rationale
-Real mobile camera photos uploaded via WhatsApp will start with `\xFF\xD8\xFF\xE0` (JFIF) or `\xFF\xD8\xFF\xE1` (EXIF). Removing the generic file signature check ensures all real images reach the Gemini 1.5 Flash vision model API in production while allowing automated pytest unit tests to pass using explicit mock byte sequences.
-
 ---
 
 ## 2. Arabizi Clock-Time Exclusion
@@ -27,9 +24,6 @@ The Arabizi regex check matches digits adjacent to letters (e.g. `3`, `7`, `9`).
 
 ### Decision
 Modify the language detection utility (`detect_arabizi_or_arabic_strict` in `app/firestore_client.py`) to strip or bypass clock-time patterns matching `\b\d{1,2}h\d{2}\b` (e.g. `07h00`, `19h00`, `06h30`) prior to evaluating digit-letter Arabizi triggers.
-
-### Rationale
-Clock times are standard format specifiers across both French and Darija text messages in Morocco. Stripping clock-time tokens before evaluating Arabizi digit rules prevents false-positive language flips.
 
 ---
 
@@ -55,9 +49,30 @@ Update `FarmProfile` in `app/schemas.py`:
 ```python
 class FarmProfile(BaseModel):
     phone_number: str
-    location: str
-    crop_type: str
-    acreage_hectares: float = Field(gt=0)
-    preferred_language: str = Field(default="fr")
+    location: Optional[Any] = Field(default="Agadir")
+    crop_type: str = Field(default="tomatoes")
+    acreage_hectares: float = Field(default=10.0, gt=0)
+    preferred_language: str = Field(default="french")
 ```
-Wire `FarmProfile.model_validate()` into `parse_profile_command` and profile update handling in `main.py` so profile updates are validated cleanly before persistence.
+Wire `FarmProfile.model_validate()` into `save_farm_profile` in `app/firestore_client.py`.
+
+---
+
+## 5. Strict Crop Catalog Fallback Elimination & README Safety Claims
+
+### Problem
+In `app/cropdoctor.py`:
+```python
+crop_catalog = ONSSA_STATIC_CATALOG.get(crop_type.lower(), ONSSA_STATIC_CATALOG["tomatoes"])
+```
+If a farmer grows an unsupported crop (e.g. `olives`, `wheat`), `lookup_onssa_product()` silently falls back to `ONSSA_STATIC_CATALOG["tomatoes"]`, returning tomato chemical pointers for non-tomato crops.
+
+### Decision
+1. Fail closed: If `crop_type.lower()` is not in `ONSSA_STATIC_CATALOG`, return `None`:
+```python
+crop_catalog = ONSSA_STATIC_CATALOG.get(crop_type.lower())
+if not crop_catalog:
+    return None
+```
+2. When `lookup_onssa_product()` returns `None`, omit chemical product pointers across all confidence tiers (including High confidence >= 75%) and instruct the farmer to consult an ONSSA-authorized retailer.
+3. Revise `README.md` safety claim: State that product names are retrieved exclusively from a static, human-verified lookup table scoped to pilot crops (tomatoes, citrus) without substituting treatment recommendations for unsupported crops. Explicitly note that model confidence scores are uncalibrated self-reports.

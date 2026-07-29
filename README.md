@@ -27,7 +27,8 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 - **Confidence-Tiered Safety Rules**:
   - *High / Medium Confidence (>=50%)*: Primary diagnosis + ONSSA product pointer + mandatory disclaimer.
   - *Low Confidence (<50%)*: Cautious observation + request for clearer photo + mandatory disclaimer (**NO chemical or product names provided**).
-- **Zero AI Product Hallucination**: Product pointers are retrieved strictly from a static Python lookup table (~10–15 common tomato/citrus pathogens mapped to ONSSA-authorized active ingredients).
+- **Constrained Product Recommendations**: Product names are retrieved exclusively from a static, human-verified lookup table strictly scoped to pilot crops (tomatoes, citrus). The model can identify a likely pathogen from a constrained list, but cannot generate, fabricate, or substitute a treatment recommendation for an unsupported crop. (Note: Self-reported model confidence scores are uncalibrated self-reports and serve solely as internal heuristic thresholds).
+
 - **Mandatory ONSSA Regulatory Disclaimer**: Every response appends:
   > *"This is a first-pass triage only. It does not replace advice from a licensed agronomist or the official product label. Always verify with ONSSA-authorized products."*
 

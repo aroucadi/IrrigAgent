@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All clarifications resolved: Constitution v1.4.0 updated to narrow voice scope note (permitting optional TTS voice output behind flag `ENABLE_DARIJA_VOICE_TEASER=true` sequenced after core loop and validated end-to-end, while keeping voice input strictly out of scope).
+- All requirements complete including User Story 5 (strict crop catalog fallback elimination for unsupported crops and README safety claim accuracy).

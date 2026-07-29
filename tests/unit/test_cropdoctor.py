@@ -87,3 +87,22 @@ def test_cropdoctor_triage_real_jpeg_bytes_not_mock():
         assert result["confidence_score"] == 0.0
     asyncio.run(_test())
 
+
+def test_cropdoctor_triage_unsupported_crop_type():
+    """Verify triage requests for unsupported crops (e.g. 'olives') fail closed with onssa_product_pointer: None even on High confidence."""
+    async def _test():
+        dummy_bytes = b"fake_high_confidence"
+        # Test direct lookup returns None for unlisted crops
+        assert lookup_onssa_product("olives", "phytophthora_infestans") is None
+        assert lookup_onssa_product("wheat", "tuta_absoluta") is None
+        
+        # Test triage response payload with unsupported crop
+        result = await perform_cropdoctor_triage(dummy_bytes, crop_type="olives")
+        assert result["confidence_tier"] == "high"
+        assert result["onssa_product_pointer"] is None
+        assert "Consult an ONSSA-authorized retailer" in result["response_text"]
+        assert "Copper hydroxide" not in result["response_text"]
+        assert result["disclaimer_included"] is True
+    asyncio.run(_test())
+
+

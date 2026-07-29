@@ -14,7 +14,15 @@
 
 ---
 
-### Scenario 2: Verify Arabizi Clock-Time Exclusion
+### Scenario 2: Verify CropDoctor Unsupported Crop Fallback
+```bash
+.venv\Scripts\python.exe -m pytest tests/unit/test_cropdoctor.py -k test_unsupported_crop
+```
+**Expected Outcome**: Requests for unsupported crop types (e.g. `olives`) return `onssa_product_pointer: None` without suggesting tomato products even on High confidence diagnoses.
+
+---
+
+### Scenario 3: Verify Arabizi Clock-Time Exclusion
 ```bash
 .venv\Scripts\python.exe -m pytest tests/unit/test_firestore_client.py -k test_detect_arabizi
 ```
@@ -22,7 +30,7 @@
 
 ---
 
-### Scenario 3: Verify FarmProfile Schema Validation
+### Scenario 4: Verify FarmProfile Schema Validation
 ```bash
 .venv\Scripts\python.exe -m pytest tests/unit/test_schemas.py
 ```
@@ -30,7 +38,7 @@
 
 ---
 
-### Scenario 4: Full Automated Test Suite Verification
+### Scenario 5: Full Automated Test Suite Verification
 ```bash
 .venv\Scripts\python.exe -m pytest tests/
 ```

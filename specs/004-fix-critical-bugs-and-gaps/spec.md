@@ -6,7 +6,12 @@
 
 **Status**: Draft
 
-**Input**: User description: "Fix CropDoctor JPEG signature mock detection collision, resolve Darija voice teaser scope deviation, tighten Arabizi regex for clock-time shapes, and align FarmProfile schema validation."
+**Input**: User description: "Fix CropDoctor JPEG signature mock detection collision, resolve Darija voice teaser scope deviation, tighten Arabizi regex for clock-time shapes, align FarmProfile schema validation, eliminate silent crop catalog fallback to tomatoes for unsupported crops, and refine README safety claims."
+
+## Clarifications
+
+### Session 2026-07-29
+- Q: How should `lookup_onssa_product()` handle unsupported crop types outside the pilot scope (tomatoes, citrus)? → A: Fail-closed. If `crop_type` is not in `ONSSA_STATIC_CATALOG`, `lookup_onssa_product()` returns `None` and uses the existing unlisted pathogen response path ("Consult an ONSSA-authorized retailer..."). No new crops are added in this pass.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -70,11 +75,28 @@ As a system operator, I want incoming and updated farm profile data (phone numbe
 
 ---
 
+### User Story 5 - Strict Crop Catalog Fallback Elimination & Accurate Safety Claims (Priority: P1)
+
+As a farmer growing a crop outside the pilot's supported catalog (e.g. olives, wheat), I want CropDoctor to never return tomato/citrus chemical recommendations for my crop, so that I am not given incorrect product advice for unsupported crops.
+
+**Why this priority**: Silently substituting tomato products for unsupported crops undermines safety intent and risks delivering harmful treatment advice to farmers.
+
+**Independent Test**: Perform a CropDoctor triage request with `crop_type="olives"` and confirm `onssa_product_pointer` returns `None` without suggesting tomato products even on High confidence diagnoses.
+
+**Acceptance Scenarios**:
+
+1. **Given** a farm profile has a `crop_type` not explicitly present in `ONSSA_STATIC_CATALOG` (e.g., `"olives"`), **When** `lookup_onssa_product()` is called, **Then** it returns `None` instead of falling back to `"tomatoes"`.
+2. **Given** `lookup_onssa_product()` returns `None` for an unsupported crop, **When** CropDoctor constructs the diagnosis payload, **Then** no chemical product name is included, the response directs the user to "Consult an ONSSA-authorized retailer for suitable products", and the mandatory ONSSA disclaimer is appended across all confidence tiers.
+3. **Given** project documentation (`README.md`) describes CropDoctor safety features, **When** describing product recommendations, **Then** it explicitly states that lookup tables are strictly scoped to pilot crops (tomatoes, citrus) and that model confidence scores are uncalibrated self-reports.
+
+---
+
 ### Edge Cases
 
 - What happens when a phone uploads a JPEG photo with non-standard EXIF metadata headers?
 - How does the system handle language detection when a message contains both clock times and legitimate Arabizi numerals?
 - What happens when a user attempts to update a profile field with missing or out-of-bounds numerical values?
+- How does CropDoctor handle a pathogen lookup for an unsupported crop with High confidence (>=75%)? (Must omit product pointer and direct user to authorized retailer).
 
 ## Requirements *(mandatory)*
 
@@ -85,6 +107,9 @@ As a system operator, I want incoming and updated farm profile data (phone numbe
 - **FR-003**: System MUST gate Darija Voice Output (TTS) behind `ENABLE_DARIJA_VOICE_TEASER=true` and enforce demo readiness criteria (sequenced after core loop, audio quality check, end-to-end OGG/OPUS WhatsApp media upload validation). Voice input (transcription/ASR) MUST remain strictly out of scope.
 - **FR-004**: System MUST validate all farm profile read/write representations against a unified data schema using standard field names (`phone_number`, `location`, `crop_type`, `acreage_hectares`, `preferred_language`).
 - **FR-005**: All error fallbacks for CropDoctor image analysis MUST return clear, actionable user guidance requesting a clearer leaf photo rather than falling back to static diagnosis data.
+- **FR-006**: `lookup_onssa_product()` MUST return `None` when `crop_type` is not listed in `ONSSA_STATIC_CATALOG` (e.g., `"olives"`), eliminating silent fallback to tomatoes.
+- **FR-007**: When `lookup_onssa_product()` returns `None` due to an unsupported crop type or unlisted pathogen, the CropDoctor response MUST omit product names and recommend consulting a licensed agronomist / ONSSA retailer across all confidence tiers (including High confidence).
+- **FR-008**: Documentation in `README.md` MUST accurately scope safety claims regarding ONSSA lookup tables, stating that product recommendations are restricted to verified pilot crops (tomatoes, citrus) without fabricating or substituting treatments for unsupported crops.
 
 ### Key Entities
 
@@ -100,9 +125,11 @@ As a system operator, I want incoming and updated farm profile data (phone numbe
 - **SC-002**: 0% false-positive Arabizi language switches triggered by standard clock-time strings (`\dh\d`).
 - **SC-003**: 100% alignment between schema validation definitions and actual profile data fields used during profile view/update flows.
 - **SC-004**: Zero unapproved architectural deviations or unverified specification claims in active feature documentation.
+- **SC-005**: 100% of triage requests for unsupported crop types (e.g. `"olives"`) return `onssa_product_pointer: None` and general retailer guidance regardless of confidence tier.
 
 ## Assumptions
 
 - Test environments provide explicit dev/test flags or unique test tokens to distinguish mock test calls from real user traffic.
 - Clock times in WhatsApp interaction flows follow common time representations (e.g. `HHhMM`, `HH:MM`).
 - Profile fields updated via WhatsApp text parsing map directly to standard agricultural profile metrics (crop type, area in hectares, location, preferred language).
+- `ONSSA_STATIC_CATALOG` strictly supports pilot crops (`"tomatoes"`, `"citrus"`). Unlisted crops require agronomist / retailer consultation.
