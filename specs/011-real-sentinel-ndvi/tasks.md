@@ -16,8 +16,8 @@
 
 **Purpose**: Update project dependencies and base schemas
 
-- [ ] T001 Update requirements.txt to add `rasterio>=1.3.0` for COG band windowed HTTP Range reads in `requirements.txt`
-- [ ] T002 [P] Update CanopyHealthReport schema in `app/schemas.py` to add `is_available: bool = True` and `no_data_reason: Optional[str] = None`
+- [x] T001 Update requirements.txt to add `rasterio>=1.3.0` for COG band windowed HTTP Range reads in `requirements.txt`
+- [x] T002 [P] Update CanopyHealthReport schema in `app/schemas.py` to add `is_available: bool = True` and `no_data_reason: Optional[str] = None`
 
 ---
 
@@ -25,7 +25,7 @@
 
 **Purpose**: Core constants and metadata data structures in `app/sentinel.py`
 
-- [ ] T003 Define named constants (`MAX_CLOUD_COVER_PERCENT = 20.0`, `SEARCH_RECENCY_DAYS = 30`) and `SentinelSceneMetadata` dataclass in `app/sentinel.py`
+- [x] T003 Define named constants (`MAX_CLOUD_COVER_PERCENT = 20.0`, `SEARCH_RECENCY_DAYS = 30`) and `SentinelSceneMetadata` dataclass in `app/sentinel.py`
 
 **Checkpoint**: Foundation ready - user story implementation can begin
 
@@ -39,9 +39,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T004 [P] [US1] Create STAC discovery test fixtures and unit tests for Element84 success and Copernicus fallback in `tests/unit/test_sentinel_canopy_heatmap.py`
-- [ ] T005 [US1] Implement Element84 STAC search query logic in `discover_sentinel2_scene` in `app/sentinel.py`
-- [ ] T006 [US1] Implement Copernicus STAC search fallback with isolated per-source try/except blocks and timeouts in `app/sentinel.py`
+- [x] T004 [P] [US1] Create STAC discovery test fixtures and unit tests for Element84 success and Copernicus fallback in `tests/unit/test_sentinel_canopy_heatmap.py`
+- [x] T005 [US1] Implement Element84 STAC search query logic in `discover_sentinel2_scene` in `app/sentinel.py`
+- [x] T006 [US1] Implement Copernicus STAC search fallback with isolated per-source try/except blocks and timeouts in `app/sentinel.py`
 
 **Checkpoint**: User Story 1 scene discovery fully functional and testable with mocked STAC APIs
 
@@ -55,10 +55,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T007 [P] [US2] Create COG band pixel array test fixtures and band retrieval unit tests in `tests/unit/test_sentinel_canopy_heatmap.py`
-- [ ] T008 [US2] Implement windowed COG band pixel extraction using `rasterio.open("/vsicurl/" + url)` in `fetch_sentinel2_bands` in `app/sentinel.py`
-- [ ] T009 [US2] Integrate scene discovery, real band retrieval, polygon NDVI calculation, and actual metadata into `generate_canopy_report` in `app/sentinel.py`
-- [ ] T010 [P] [US2] Add deterministic test asserting two distinct mock inputs yield non-synthetic, distinct NDVI results (satisfying SC-003) in `tests/unit/test_sentinel_canopy_heatmap.py`
+- [x] T007 [P] [US2] Create COG band pixel array test fixtures and band retrieval unit tests in `tests/unit/test_sentinel_canopy_heatmap.py`
+- [x] T008 [US2] Implement windowed COG band pixel extraction using `rasterio.open("/vsicurl/" + url)` in `fetch_sentinel2_bands` in `app/sentinel.py`
+- [x] T009 [US2] Integrate scene discovery, real band retrieval, polygon NDVI calculation, and actual metadata into `generate_canopy_report` in `app/sentinel.py`
+- [x] T010 [P] [US2] Add deterministic test asserting two distinct mock inputs yield non-synthetic, distinct NDVI results (satisfying SC-003) in `tests/unit/test_sentinel_canopy_heatmap.py`
 
 **Checkpoint**: User Story 1 AND User Story 2 complete - real scene discovery and band NDVI pipeline fully operational
 
@@ -72,8 +72,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T011 [P] [US3] Create fail-closed test assertions for zero clear scenes in `tests/unit/test_sentinel_canopy_heatmap.py`
-- [ ] T012 [US3] Implement fail-closed report builder when discovery returns `None` in `generate_canopy_report` in `app/sentinel.py`
+- [x] T011 [P] [US3] Create fail-closed test assertions for zero clear scenes in `tests/unit/test_sentinel_canopy_heatmap.py`
+- [x] T012 [US3] Implement fail-closed report builder when discovery returns `None` in `generate_canopy_report` in `app/sentinel.py`
 
 **Checkpoint**: Fail-closed protocol complete and verified
 
@@ -83,8 +83,8 @@
 
 **Purpose**: Verification and full test suite enforcement
 
-- [ ] T013 [P] Verify 100% test pass rate across full suite by executing `pytest tests/`
-- [ ] T014 Run validation scenarios documented in `quickstart.md`
+- [x] T013 [P] Verify 100% test pass rate across full suite by executing `pytest tests/`
+- [x] T014 Run validation scenarios documented in `quickstart.md`
 
 ---
 

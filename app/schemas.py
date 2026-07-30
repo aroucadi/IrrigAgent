@@ -182,6 +182,9 @@ class CanopyHealthReport(BaseModel):
     recommendation: str
     media_id: Optional[str] = None
     image_bytes: Optional[bytes] = None
+    is_available: bool = True
+    no_data_reason: Optional[str] = None
+
 
 
 class VoiceIntentStatus(str, Enum):

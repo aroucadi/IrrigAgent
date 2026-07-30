@@ -250,6 +250,11 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
 
         crop_type = profile.get("crop_type", "Tomatoes")
         report = generate_canopy_report(sender, parcel, farm_name="Hassan Farm", crop_type=crop_type)
+        if not report.is_available or not report.image_bytes:
+            reply = f"🛰️ Sentinel-2 Canopy Health Report\n\n{report.recommendation}"
+            await send_text_message(sender, reply)
+            return {"status": "heatmap_unavailable", "reason": report.no_data_reason}
+
         media_id = await upload_media(report.image_bytes, mime_type="image/png", filename="sentinel_heatmap.png")
 
         caption = (
@@ -260,6 +265,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
 
         await send_image_message(sender, media_id, caption=caption)
         return {"status": "heatmap_dispatched", "media_id": media_id}
+
 
     # 3. Handle Leaf Photo Image Event (CropDoctor)
     if msg_type == "image" or image_id:
