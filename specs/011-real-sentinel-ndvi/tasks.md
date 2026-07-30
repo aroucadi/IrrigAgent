@@ -125,3 +125,8 @@
 2. Add STAC discovery -> Element84 & Copernicus fallback working
 3. Add COG band math -> Real reflectance heatmaps working
 4. Add fail-closed protocol -> Graceful handling of zero clear imagery
+
+## Phase 7: Convergence
+
+- [ ] T015 Remove synthetic sine/cosine fallback in fetch_sentinel2_bands in app/sentinel.py per FR-012, Constitution VIII (contradicts)
+
