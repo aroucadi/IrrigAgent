@@ -1,8 +1,8 @@
 <!--
 ### Sync Impact Report
-- Version change: 1.3.0 → 1.4.0
+- Version change: 1.4.0 → 1.5.0
 - Modified principles:
-  - Section V (Voice Scope Note): Narrowed voice scope to explicitly allow optional Voice Output (TTS) behind feature flag `ENABLE_DARIJA_VOICE_TEASER=true` after core loop pilot validation, while explicitly keeping Voice Input (transcription/ASR) out of scope.
+  - Section VIII (Quality, Security & Automated Verification Gates): Added mandatory No-Facade Rule requiring that core external API/model calls must not contain reachable hardcoded or synthetic default paths outside explicit test fixtures, and every "Completed & Verified" claim must include a passing test that fails if the mock path is hit with production-shaped input.
 - Added sections: None
 - Removed sections: None
 - Templates requiring updates:
@@ -55,6 +55,7 @@ All development and feature deliverables MUST satisfy mandatory automated verifi
 - **Zero Secrets in Code**: Hardcoding, staging, or committing plain-text API keys, Google Cloud service account JSON credentials, or Meta WhatsApp tokens is strictly forbidden.
 - **Mandatory Pre-Commit Gate Enforcement**: All local commits MUST execute and pass automated pre-commit hook checks enforcing secret scanning, fast unit tests (execution time < 3.0 seconds), and static linting/formatting (`ruff`, `black`).
 - **Automated Verification Standard**: Every major feature specification MUST explicitly define acceptance criteria that can be verified deterministically via automated test assertions or endpoint health/swagger checks.
+- **No-Facade Rule for External Integrations**: No feature may be marked Completed if its core external API/model call has a hardcoded or synthetic default path reachable outside explicit test fixtures. Every "Completed & Verified" claim MUST include a passing test that fails if the mock path is hit with production-shaped input.
 
 ## Technical & Architectural Constraints
 
@@ -81,4 +82,4 @@ All development and feature deliverables MUST satisfy mandatory automated verifi
   - **MINOR**: Addition of new principles, expanded scope boundaries, or governance rules.
   - **PATCH**: Clarifications, formatting, typo corrections, and non-semantic refinements.
 
-**Version**: 1.4.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-29
+**Version**: 1.5.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-30

@@ -244,11 +244,12 @@ async def perform_cropdoctor_triage(
             "confidence_tier": None,
             "fail_closed_active": False,
             "onssa_product_pointer": None,
-            "disclaimer_included": False,
+            "disclaimer_included": True,
             "is_unreadable": True,
             "response_text": (
                 "🍃 *CropDoctor Advisory*\n"
-                "No plant leaf identified in the photo. Please send a clear, close-up photograph of the affected leaf."
+                "No plant leaf identified in the photo. Please send a clear, close-up photograph of the affected leaf.\n\n"
+                f"⚠️ {ONSSA_DISCLAIMER}"
             ),
         }
 
@@ -277,9 +278,9 @@ async def perform_cropdoctor_triage(
                 "confidence_tier": None,
                 "fail_closed_active": False,
                 "onssa_product_pointer": None,
-                "disclaimer_included": False,
+                "disclaimer_included": True,
                 "is_unreadable": True,
-                "response_text": quality_result.user_feedback_text,
+                "response_text": f"{quality_result.user_feedback_text}\n\n⚠️ {ONSSA_DISCLAIMER}",
                 "prefilter_defect": quality_result.defect_reason.value,
                 "prefilter_metrics": quality_result.metrics.model_dump() if quality_result.metrics else None,
             }
@@ -316,11 +317,12 @@ async def perform_cropdoctor_triage(
                         "confidence_tier": None,
                         "fail_closed_active": False,
                         "onssa_product_pointer": None,
-                        "disclaimer_included": False,
+                        "disclaimer_included": True,
                         "is_unreadable": True,
                         "response_text": (
                             "🍃 *CropDoctor Advisory*\n"
-                            "No plant leaf identified in the photo. Please send a clear, close-up photograph of the affected leaf."
+                            "No plant leaf identified in the photo. Please send a clear, close-up photograph of the affected leaf.\n\n"
+                            f"⚠️ {ONSSA_DISCLAIMER}"
                         ),
                     }
                 pathogen_key = parsed.get("pathogen_key", "unknown")
@@ -338,11 +340,12 @@ async def perform_cropdoctor_triage(
                 "confidence_tier": None,
                 "fail_closed_active": False,
                 "onssa_product_pointer": None,
-                "disclaimer_included": False,
+                "disclaimer_included": True,
                 "is_unreadable": True,
                 "response_text": (
                     "🍃 *CropDoctor Advisory*\n"
-                    "No plant leaf identified in the photo. Please send a clear, close-up photograph of the affected leaf."
+                    "No plant leaf identified in the photo. Please send a clear, close-up photograph of the affected leaf.\n\n"
+                    f"⚠️ {ONSSA_DISCLAIMER}"
                 ),
             }
 

@@ -288,10 +288,11 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
             await send_text_message(sender, triage_result["response_text"])
             return {"status": "triage_completed" if not triage_result.get("is_unreadable") else "triage_unreadable"}
         except Exception as e:
+            from app.cropdoctor import ONSSA_DISCLAIMER
             error_msg = (
                 "🍃 *CropDoctor Advisory*\n"
                 "Unable to process image. Please try resending a clear leaf photo.\n\n"
-                "⚠️ This is a first-pass triage only. Always verify with ONSSA-authorized products."
+                f"⚠️ {ONSSA_DISCLAIMER}"
             )
             await send_text_message(sender, error_msg)
             return {"status": "triage_error", "error": str(e)}

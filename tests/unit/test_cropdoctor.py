@@ -55,7 +55,7 @@ def test_cropdoctor_triage_low_confidence_multi_leaf_or_low_light():
 
 
 def test_cropdoctor_triage_unreadable_or_non_plant_photo():
-    """Verify unreadable or non-plant photo returns request for leaf close-up without diagnosis, tier, or disclaimer per FR-017."""
+    """Verify unreadable or non-plant photo returns request for leaf close-up without diagnosis or tier, but with disclaimer per FR-008/FR-017."""
     async def _test():
         unreadable_bytes = b"unreadable_image"
         result = await perform_cropdoctor_triage(unreadable_bytes, "tomatoes", force_unreadable=True)
@@ -63,8 +63,8 @@ def test_cropdoctor_triage_unreadable_or_non_plant_photo():
         assert result["is_unreadable"] is True
         assert result["confidence_tier"] is None
         assert result["onssa_product_pointer"] is None
-        assert result["disclaimer_included"] is False
-        assert ONSSA_DISCLAIMER not in result["response_text"]
+        assert result["disclaimer_included"] is True
+        assert ONSSA_DISCLAIMER in result["response_text"]
         assert "No plant leaf identified in the photo" in result["response_text"]
     asyncio.run(_test())
 

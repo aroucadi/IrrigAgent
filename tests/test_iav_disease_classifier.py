@@ -266,14 +266,14 @@ class TestFailClosedBehavior:
 
     @pytest.mark.asyncio
     async def test_unreadable_image_response(self):
-        """Unreadable byte string returns unreadable=True with no product or disclaimer."""
+        """Unreadable byte string returns unreadable=True with no product, but disclaimer included per FR-008."""
         response = await perform_cropdoctor_triage(b"unreadable_image", crop_type="tomatoes")
         assert response["is_unreadable"] is True
         assert response["pathogen_identified"] == "unreadable"
         assert response["confidence_score"] == 0.0
         assert response["calibrated_confidence"] == 0.0
         assert response["onssa_product_pointer"] is None
-        assert response["disclaimer_included"] is False
+        assert response["disclaimer_included"] is True
 
     @pytest.mark.asyncio
     async def test_response_always_contains_calibrated_confidence(self):
