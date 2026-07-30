@@ -20,6 +20,7 @@ _IN_MEMORY_RECOMMENDATIONS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_TRIAGE_REQUESTS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_PIN_SESSIONS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_FARM_PARCELS: Dict[str, Dict[str, Any]] = {}
+_IN_MEMORY_PENDING_INTENTS: Dict[str, Dict[str, Any]] = {}
 
 _db_client = None
 
@@ -304,3 +305,103 @@ async def get_farm_parcel(phone_number: str) -> Optional[Dict[str, Any]]:
     if profile and "parcel" in profile:
         return profile["parcel"]
     return _IN_MEMORY_FARM_PARCELS.get(phone_number)
+
+
+async def save_pending_intent(phone_number: str, intent_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Persist a draft voice intent in Firestore under pending_intents collection."""
+    now_utc = datetime.now(timezone.utc)
+    from datetime import timedelta
+    created_at_str = intent_data.get("created_at") or now_utc.isoformat()
+    expires_at_str = intent_data.get("expires_at") or (now_utc + timedelta(minutes=15)).isoformat()
+    
+    payload = {
+        "pending_voice_intent": {
+            "intent_type": intent_data.get("intent_type", "MODIFY_IRRIGATION"),
+            "proposed_adjustment_minutes": intent_data.get("proposed_adjustment_minutes", 15),
+            "confidence_score": float(intent_data.get("confidence_score", 0.85)),
+            "transcribed_text": intent_data.get("transcribed_text", ""),
+            "created_at": created_at_str,
+            "expires_at": expires_at_str,
+            "status": intent_data.get("status", "AWAITING_CONFIRMATION")
+        }
+    }
+    
+    doc_id = f"pending_{phone_number}"
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("pending_intents").document(doc_id)
+            await doc_ref.set(payload, merge=True)
+        except Exception:
+            pass
+            
+    _IN_MEMORY_PENDING_INTENTS[phone_number] = payload
+    return payload
+
+
+async def get_pending_intent(phone_number: str) -> Optional[Dict[str, Any]]:
+    """Retrieve active pending intent for phone number, checking 15-minute TTL expiration."""
+    doc_id = f"pending_{phone_number}"
+    record = None
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("pending_intents").document(doc_id)
+            doc = await doc_ref.get()
+            if doc.exists:
+                record = doc.to_dict()
+        except Exception:
+            pass
+            
+    if not record:
+        record = _IN_MEMORY_PENDING_INTENTS.get(phone_number)
+        
+    if not record or "pending_voice_intent" not in record:
+        return None
+        
+    inner = record["pending_voice_intent"]
+    expires_at_raw = inner.get("expires_at")
+    if expires_at_raw:
+        try:
+            exp_time = datetime.fromisoformat(expires_at_raw.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) > exp_time:
+                inner["status"] = "EXPIRED"
+                await update_pending_intent_status(phone_number, "EXPIRED")
+        except Exception:
+            pass
+            
+    return record
+
+
+async def update_pending_intent_status(phone_number: str, status: str) -> Optional[Dict[str, Any]]:
+    """Update status of pending intent for phone number."""
+    record = await get_pending_intent(phone_number)
+    if not record or "pending_voice_intent" not in record:
+        return None
+        
+    record["pending_voice_intent"]["status"] = status
+    doc_id = f"pending_{phone_number}"
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("pending_intents").document(doc_id)
+            await doc_ref.set(record, merge=True)
+        except Exception:
+            pass
+            
+    _IN_MEMORY_PENDING_INTENTS[phone_number] = record
+    return record
+
+
+async def delete_pending_intent(phone_number: str) -> None:
+    """Delete pending intent record."""
+    doc_id = f"pending_{phone_number}"
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("pending_intents").document(doc_id)
+            await doc_ref.delete()
+        except Exception:
+            pass
+    _IN_MEMORY_PENDING_INTENTS.pop(phone_number, None)
+

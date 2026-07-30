@@ -13,7 +13,11 @@ from app.whatsapp import (
     download_media,
 )
 from app.weather import get_et0_forecast
-from app.decision import evaluate_irrigation_recommendation
+from app.decision import (
+    evaluate_irrigation_recommendation,
+    process_voice_note,
+    process_pending_intent_reply,
+)
 from app.regex_parser import (
     parse_modification_text,
     is_parcel_start_command,
@@ -146,6 +150,26 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         )
         await send_text_message(sender, greeting_msg)
         return {"status": "welcomed"}
+
+    # 0. Handle WhatsApp Voice Note / Audio Attachment Event
+    if msg_type in ("audio", "voice") or incoming.get("audio_id"):
+        audio_id = incoming.get("audio_id") or "mock_audio_1"
+        duration = incoming.get("audio_duration", 0)
+        audio_bytes = await download_media(audio_id)
+        reply_text, allow_tts = await process_voice_note(sender, audio_bytes, duration_seconds=duration)
+        await send_text_message(sender, reply_text)
+        if allow_tts and ENABLE_DARIJA_VOICE_TEASER:
+            background_tasks.add_task(dispatch_darija_voice_teaser, sender, reply_text)
+        return {"status": "voice_note_processed"}
+
+    # Check if incoming text is targeted at an active pending voice intent
+    if text:
+        was_handled, pending_reply_text = await process_pending_intent_reply(sender, text)
+        if was_handled:
+            await send_text_message(sender, pending_reply_text)
+            if ENABLE_DARIJA_VOICE_TEASER:
+                background_tasks.add_task(dispatch_darija_voice_teaser, sender, pending_reply_text)
+            return {"status": "pending_intent_reply_processed"}
 
     # 1. Handle WhatsApp Location Attachment Event (Pin Collection)
     if msg_type == "location":

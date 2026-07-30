@@ -5,19 +5,58 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas import QualityDefectReason
-from app.image_prefilter import validate_image_quality
+from app.image_prefilter import validate_image_quality, compute_foliage_green_ratio
 from app.cropdoctor import perform_cropdoctor_triage
 
 
 def _create_sharp_image_bytes(width=400, height=400) -> bytes:
-    """Helper to generate a sharp synthetic image with balanced luminance and high sharpness."""
-    img = np.full((height, width, 3), 128, dtype=np.uint8)
+    """
+    Helper to generate a sharp synthetic green image (simulates leaf photo).
+    Uses green base color so foliage HSV ratio check ≥ 30% is satisfied.
+    Uses dark grid stripes to produce high Laplacian variance (sharpness check).
+    """
+    img = np.zeros((height, width, 3), dtype=np.uint8)
+    # Green base: BGR (40, 160, 40) → OpenCV HSV H≈60 → within foliage range [35,85]
+    img[:, :, 0] = 40   # blue
+    img[:, :, 1] = 160  # green
+    img[:, :, 2] = 40   # red
+    # Add sharp dark stripes for high Laplacian variance
     step_y = max(5, height // 10)
     step_x = max(5, width // 10)
     for i in range(0, height, step_y):
-        img[i, :, :] = 220
+        img[i, :, :] = 10
     for j in range(0, width, step_x):
-        img[:, j, :] = 30
+        img[:, j, :] = 10
+    success, encoded = cv2.imencode(".jpg", img)
+    assert success
+    return encoded.tobytes()
+
+
+def _create_green_leaf_image_bytes(width=400, height=400) -> bytes:
+    """Helper to generate a sharp image with >30% green foliage HSV coverage."""
+    img = np.zeros((height, width, 3), dtype=np.uint8)
+    # Fill majority with a green tone (BGR: approx HSV hue ~60 deg = pure green)
+    img[:, :, 1] = 180  # strong green channel
+    img[:, :, 0] = 40   # low blue
+    img[:, :, 2] = 40   # low red
+    # Add sharp edge features for blur check
+    for i in range(0, height, 20):
+        img[i, :, 1] = 30
+    success, encoded = cv2.imencode(".jpg", img)
+    assert success
+    return encoded.tobytes()
+
+
+def _create_non_foliage_image_bytes(width=400, height=400) -> bytes:
+    """Helper to generate a sharp image with NO green foliage (e.g. concrete/soil)."""
+    img = np.full((height, width, 3), 128, dtype=np.uint8)
+    # Red-brown tone - no green HSV presence
+    img[:, :, 2] = 200  # high red
+    img[:, :, 1] = 80   # low green
+    img[:, :, 0] = 40   # low blue
+    # Add sharp edge features for blur check
+    for i in range(0, height, 20):
+        img[i, :, :] = 30
     success, encoded = cv2.imencode(".jpg", img)
     assert success
     return encoded.tobytes()
@@ -107,12 +146,40 @@ def test_corrupt_or_invalid_bytes():
 
 
 def test_resolution_too_low():
-    """Verify image below minimum width/height is rejected."""
+    """Verify image below minimum width/height (< 400px) is rejected."""
     small_bytes = _create_sharp_image_bytes(width=100, height=100)
     result = validate_image_quality(small_bytes)
 
     assert result.is_acceptable is False
     assert result.defect_reason == QualityDefectReason.RESOLUTION_TOO_LOW
+
+
+def test_resolution_threshold_exactly_400px():
+    """Verify image at exactly 400x400 passes the resolution check."""
+    boundary_bytes = _create_green_leaf_image_bytes(width=400, height=400)
+    result = validate_image_quality(boundary_bytes)
+    # If the image passes all quality criteria, it must not fail resolution
+    assert result.defect_reason != QualityDefectReason.RESOLUTION_TOO_LOW
+
+
+def test_compute_foliage_green_ratio_high_green():
+    """Verify green foliage ratio computation returns high ratio for green image."""
+    green_img = np.zeros((200, 200, 3), dtype=np.uint8)
+    green_img[:, :, 1] = 180  # strong green
+    green_img[:, :, 0] = 40
+    green_img[:, :, 2] = 40
+    ratio = compute_foliage_green_ratio(green_img, min_hue_deg=35, max_hue_deg=85)
+    assert ratio >= 0.30, f"Expected foliage ratio >= 0.30, got {ratio}"
+
+
+def test_compute_foliage_green_ratio_non_green():
+    """Verify foliage ratio returns low value for non-green image."""
+    red_img = np.zeros((200, 200, 3), dtype=np.uint8)
+    red_img[:, :, 2] = 200  # red dominant
+    red_img[:, :, 1] = 60
+    red_img[:, :, 0] = 30
+    ratio = compute_foliage_green_ratio(red_img, min_hue_deg=35, max_hue_deg=85)
+    assert ratio < 0.30, f"Expected foliage ratio < 0.30 for non-green image, got {ratio}"
 
 
 @pytest.mark.asyncio
@@ -142,3 +209,13 @@ def test_rest_endpoint_prefilter():
     assert data["is_acceptable"] is True
     assert data["defect_reason"] == "NONE"
     assert "metrics" in data
+
+
+def test_prefilter_latency_under_300ms():
+    """Verify SC-001: Quality Gate evaluation completes in under 300ms."""
+    sharp_bytes = _create_sharp_image_bytes(width=400, height=400)
+    result = validate_image_quality(sharp_bytes)
+    assert result.is_acceptable is True
+    assert result.metrics is not None
+    assert result.metrics.latency_ms < 300.0, f"Quality Gate latency {result.metrics.latency_ms}ms exceeded 300ms"
+

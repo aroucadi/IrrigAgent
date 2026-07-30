@@ -73,12 +73,17 @@ def extract_incoming_message(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
         text_body = msg.get("text", {}).get("body") if msg_type == "text" else None
         image_id = msg.get("image", {}).get("id") if msg_type == "image" else None
         location_data = msg.get("location") if msg_type == "location" else None
+        audio_obj = msg.get("audio") or msg.get("voice") or {}
+        audio_id = audio_obj.get("id") if msg_type in ("audio", "voice") else None
+        audio_duration = int(audio_obj.get("seconds") or audio_obj.get("duration") or 0) if msg_type in ("audio", "voice") else 0
 
         return {
             "from": sender,
             "type": msg_type,
             "text": text_body,
             "image_id": image_id,
+            "audio_id": audio_id,
+            "audio_duration": audio_duration,
             "location": location_data,
             "message_id": msg.get("id"),
         }

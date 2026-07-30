@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WhatsAppVoiceIntentContract",
+  "description": "JSON Schema for Voice-to-Intent Speech Recognition and Firestore Pending Intent Lifecycle",
+  "type": "object",
+  "required": ["pending_voice_intent"],
+  "properties": {
+    "pending_voice_intent": {
+      "type": "object",
+      "required": [
+        "intent_type",
+        "proposed_adjustment_minutes",
+        "confidence_score",
+        "transcribed_text",
+        "created_at",
+        "expires_at",
+        "status"
+      ],
+      "properties": {
+        "intent_type": {
+          "type": "string",
+          "enum": [
+            "MODIFY_IRRIGATION",
+            "INCREASE_IRRIGATION",
+            "DECREASE_IRRIGATION",
+            "SKIP_IRRIGATION"
+          ]
+        },
+        "proposed_adjustment_minutes": {
+          "type": "integer",
+          "description": "Proposed irrigation duration adjustment in minutes"
+        },
+        "confidence_score": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "ASR transcribe confidence score"
+        },
+        "transcribed_text": {
+          "type": "string",
+          "description": "Raw Darija transcript from ASR"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "AWAITING_CONFIRMATION",
+            "CONFIRMED",
+            "CANCELED",
+            "EXPIRED"
+          ]
+        }
+      }
+    }
+  }
+}

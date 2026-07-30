@@ -24,13 +24,19 @@ def test_cropdoctor_triage_high_confidence():
 
 
 def test_cropdoctor_triage_medium_confidence():
+    """Medium confidence (0.50–0.74) triggers fail-closed: no chemical product name per FR-022/spec 010."""
     async def _test():
         dummy_bytes = b"fake_medium_confidence"
         result = await perform_cropdoctor_triage(dummy_bytes, "tomatoes")
         assert result["confidence_tier"] == "medium"
-        assert result["onssa_product_pointer"] is not None
+        # Fail-closed: medium confidence must NOT expose ONSSA chemical names
+        assert result["onssa_product_pointer"] is None
+        assert result["fail_closed_active"] is True
         assert ONSSA_DISCLAIMER in result["response_text"]
+        # Cultural practices advice must be present instead of active ingredient names
+        assert "agronomist" in result["response_text"] or "cultural" in result["response_text"].lower()
     asyncio.run(_test())
+
 
 
 def test_cropdoctor_triage_low_confidence_multi_leaf_or_low_light():
@@ -89,7 +95,7 @@ def test_cropdoctor_triage_real_jpeg_bytes_not_mock():
 
 
 def test_cropdoctor_triage_unsupported_crop_type():
-    """Verify triage requests for unsupported crops (e.g. 'olives') fail closed with onssa_product_pointer: None even on High confidence."""
+    """Verify triage requests for unsupported crops (e.g. 'olives') fail closed with onssa_product_pointer: None and include redirect notice."""
     async def _test():
         dummy_bytes = b"fake_high_confidence"
         # Test direct lookup returns None for unlisted crops
@@ -101,8 +107,23 @@ def test_cropdoctor_triage_unsupported_crop_type():
         assert result["confidence_tier"] == "high"
         assert result["onssa_product_pointer"] is None
         assert "Consult an ONSSA-authorized retailer" in result["response_text"]
+        assert "target vision support currently focuses on Tomatoes and Citrus" in result["response_text"]
         assert "Copper hydroxide" not in result["response_text"]
         assert result["disclaimer_included"] is True
     asyncio.run(_test())
+
+
+def test_cropdoctor_triage_latency_under_3000ms():
+    """Verify SC-006: End-to-end vision triage response completes in under 3.0 seconds."""
+    import time
+    async def _test():
+        start_time = time.perf_counter()
+        dummy_bytes = b"fake_high_confidence"
+        result = await perform_cropdoctor_triage(dummy_bytes, crop_type="tomatoes")
+        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+        assert result["disclaimer_included"] is True
+        assert elapsed_ms < 3000.0, f"Triage response latency {elapsed_ms}ms exceeded 3000ms"
+    asyncio.run(_test())
+
 
 

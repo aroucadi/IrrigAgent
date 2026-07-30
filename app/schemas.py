@@ -10,6 +10,7 @@ class QualityDefectReason(str, Enum):
     TOO_DARK = "TOO_DARK"
     TOO_BRIGHT = "TOO_BRIGHT"
     RESOLUTION_TOO_LOW = "RESOLUTION_TOO_LOW"
+    NO_LEAF_DETECTED = "NO_LEAF_DETECTED"
 
 
 class PreFilterConfig(BaseModel):
@@ -19,8 +20,11 @@ class PreFilterConfig(BaseModel):
     max_mean_luminance: float = Field(default=220.0, description="Maximum mean grayscale intensity (0-255)")
     max_dark_pixel_ratio: float = Field(default=0.40, description="Maximum allowed ratio of pixels < 15 intensity")
     max_bright_pixel_ratio: float = Field(default=0.35, description="Maximum allowed ratio of pixels > 245 intensity")
-    min_width_px: int = Field(default=200, description="Minimum allowed image width in pixels")
-    min_height_px: int = Field(default=200, description="Minimum allowed image height in pixels")
+    min_width_px: int = Field(default=400, description="Minimum allowed image width in pixels")
+    min_height_px: int = Field(default=400, description="Minimum allowed image height in pixels")
+    min_hue_deg: int = Field(default=35, description="Minimum green foliage HSV hue angle in degrees")
+    max_hue_deg: int = Field(default=85, description="Maximum green foliage HSV hue angle in degrees")
+    min_foliage_ratio: float = Field(default=0.30, description="Minimum required green foliage pixel ratio")
 
 
 class ImageQualityMetrics(BaseModel):
@@ -30,6 +34,7 @@ class ImageQualityMetrics(BaseModel):
     mean_luminance: float = Field(description="Average grayscale brightness (0.0 to 255.0)")
     dark_pixel_ratio: float = Field(description="Ratio of near-black pixels (0.0 to 1.0)")
     bright_pixel_ratio: float = Field(description="Ratio of near-white/glare pixels (0.0 to 1.0)")
+    foliage_pixel_ratio: float = Field(default=0.0, description="Ratio of pixels in foliage green HSV range")
     latency_ms: float = Field(description="Total pre-filter execution time in milliseconds")
 
 
@@ -38,6 +43,38 @@ class QualityCheckResult(BaseModel):
     defect_reason: QualityDefectReason = Field(default=QualityDefectReason.NONE, description="Primary quality defect if failed")
     user_feedback_text: Optional[str] = Field(default=None, description="Actionable retake instructions if failed")
     metrics: Optional[ImageQualityMetrics] = Field(default=None, description="Raw numerical diagnostics")
+
+
+class VisionClassificationResult(BaseModel):
+    vision_engine: str = Field(description="Active classification engine")
+    pathogen_identified: str = Field(description="Primary disease identifier or ONSSA code")
+    symptom_name_fr: Optional[str] = Field(default=None, description="French/Darija symptom description")
+    raw_confidence: float = Field(description="Uncalibrated output score 0.0 to 1.0")
+    calibrated_confidence: float = Field(description="Temperature-scaled confidence score 0.0 to 1.0")
+    confidence_tier: str = Field(description="Tier classification: high, medium, low")
+    fail_closed_active: bool = Field(description="True if calibrated confidence < 0.75 suppressed active chemical names")
+    onssa_product_pointer: Optional[str] = Field(default=None, description="Authorized ONSSA chemical product")
+    disclaimer_included: bool = Field(default=True, description="Verification of mandatory ONSSA disclaimer")
+    response_text: str = Field(description="Final WhatsApp advisory message text")
+
+
+class BoundingBox(BaseModel):
+    xmin: float = Field(ge=0.0, le=1.0)
+    ymin: float = Field(ge=0.0, le=1.0)
+    xmax: float = Field(ge=0.0, le=1.0)
+    ymax: float = Field(ge=0.0, le=1.0)
+
+
+class IAVDatasetRecord(BaseModel):
+    sample_id: str = Field(description="Unique IAV record identifier")
+    image_path: Optional[str] = Field(default=None, description="Path to image asset")
+    crop_type: str = Field(description="Target crop category (tomatoes or citrus)")
+    disease_onssa_code: str = Field(description="ONSSA primary disease registration code")
+    severity_index: int = Field(ge=1, le=5, description="Disease severity rating Grade 1 to 5")
+    bounding_boxes: list[BoundingBox] = Field(default_factory=list, description="Lesion bounding box list")
+    region: str = Field(default="Souss-Massa", description="Collection region (Souss-Massa or Gharb)")
+    cultivar: Optional[str] = Field(default=None, description="Moroccan crop cultivar name")
+
 
 
 
@@ -145,3 +182,32 @@ class CanopyHealthReport(BaseModel):
     recommendation: str
     media_id: Optional[str] = None
     image_bytes: Optional[bytes] = None
+
+
+class VoiceIntentStatus(str, Enum):
+    AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION"
+    CONFIRMED = "CONFIRMED"
+    CANCELED = "CANCELED"
+    EXPIRED = "EXPIRED"
+
+
+class VoiceIntentType(str, Enum):
+    MODIFY_IRRIGATION = "MODIFY_IRRIGATION"
+    INCREASE_IRRIGATION = "INCREASE_IRRIGATION"
+    DECREASE_IRRIGATION = "DECREASE_IRRIGATION"
+    SKIP_IRRIGATION = "SKIP_IRRIGATION"
+
+
+class PendingVoiceIntentPayload(BaseModel):
+    intent_type: VoiceIntentType = Field(default=VoiceIntentType.MODIFY_IRRIGATION)
+    proposed_adjustment_minutes: int = Field(default=15)
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    transcribed_text: str
+    created_at: str
+    expires_at: str
+    status: VoiceIntentStatus = Field(default=VoiceIntentStatus.AWAITING_CONFIRMATION)
+
+
+class PendingVoiceIntentDoc(BaseModel):
+    pending_voice_intent: PendingVoiceIntentPayload
+

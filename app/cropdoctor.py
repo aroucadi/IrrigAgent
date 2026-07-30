@@ -13,21 +13,25 @@ ONSSA_STATIC_CATALOG: Dict[str, Dict[str, str]] = {
         "phytophthora_infestans": "Copper hydroxide / Azoxystrobin (ONSSA authorized class)",
         "alternaria_solani": "Difenoconazole / Mancozeb (ONSSA authorized class)",
         "powdery_mildew": "Sulfur / Penconazole (ONSSA authorized class)",
+        "tylcv": "Insecticide seed treatment - Imidacloprid (ONSSA authorized class) — vector control",
+        "early_blight": "Difenoconazole / Mancozeb (ONSSA authorized class)",
     },
     "citrus": {
         "citrus_canker": "Copper oxychloride (ONSSA authorized class)",
         "citrus_aphids": "Acetamiprid / Pyrethrin (ONSSA authorized class)",
         "spider_mites": "Abamectin / Hexythiazox (ONSSA authorized class)",
+        "hlb": "No curative product available — remove and destroy affected trees, consult ONSSA",
+        "alternaria_leaf_spot": "Copper-based fungicide (ONSSA authorized class)",
     }
 }
 
 
-_DATASET_PATH = os.path.join("data", "onssa_registry.json")
+_DATASET_PATH = os.path.join("data", "onssa_authorized_products.json")
 
 
 def _load_onssa_catalog() -> tuple[Dict[str, Dict[str, str]], str]:
     """
-    Attempts to load treatment catalog from data/onssa_registry.json.
+    Attempts to load treatment catalog from data/onssa_authorized_products.json.
     Falls back to ONSSA_STATIC_CATALOG if dataset file is absent, empty, or unreadable.
     """
     if os.path.exists(_DATASET_PATH):
@@ -82,9 +86,133 @@ def lookup_onssa_product(crop_type: str, pathogen_key: str) -> Optional[str]:
     return None
 
 
+def apply_temperature_scaling(raw_logit_confidence: float, temperature: float = 1.25) -> float:
+    """
+    Applies temperature scaling calibration to a raw uncalibrated confidence score.
+
+    In temperature scaling, a model's logits are divided by T before softmax.
+    For a scalar max-probability p (already softmax'd), this approximates as:
+        calibrated = p ** T
+
+    When T > 1.0: confidence is reduced (distribution softened — overconfidence corrected).
+    When T < 1.0: confidence is amplified (sharpened distribution).
+    When T = 1.0: passthrough, no change.
+
+    Args:
+        raw_logit_confidence: Uncalibrated model output probability (0.0 to 1.0).
+        temperature: Temperature scalar T > 0. T > 1.0 reduces confidence (softens distribution).
+
+    Returns:
+        Calibrated confidence score (0.0 to 1.0).
+    """
+    if temperature <= 0:
+        return raw_logit_confidence
+    if raw_logit_confidence <= 0.0:
+        return 0.0
+    if raw_logit_confidence >= 1.0:
+        return 1.0
+    calibrated = raw_logit_confidence ** temperature
+    return round(min(max(float(calibrated), 0.0), 1.0), 4)
+
+
+def validate_iav_dataset_record(record: Dict[str, Any]) -> tuple[bool, list[str]]:
+    """
+    Validates an IAV Hassan II dataset record against the mandatory annotation schema.
+
+    Required fields:
+        - sample_id (str)
+        - crop_type (str, must be 'tomatoes' or 'citrus')
+        - disease_onssa_code (str)
+        - severity_index (int, 1 to 5)
+        - bounding_boxes (list)
+
+    Returns:
+        Tuple of (is_valid: bool, errors: list[str])
+    """
+    errors = []
+
+    if not record.get("sample_id"):
+        errors.append("Missing required field: sample_id")
+
+    crop_type = record.get("crop_type", "")
+    if crop_type not in ("tomatoes", "citrus"):
+        errors.append(f"Invalid crop_type '{crop_type}': must be 'tomatoes' or 'citrus'")
+
+    if not record.get("disease_onssa_code"):
+        errors.append("Missing required field: disease_onssa_code")
+
+    severity = record.get("severity_index")
+    if severity is None:
+        errors.append("Missing required field: severity_index")
+    elif not isinstance(severity, int) or severity < 1 or severity > 5:
+        errors.append(f"Invalid severity_index '{severity}': must be integer 1-5")
+
+    bboxes = record.get("bounding_boxes")
+    if bboxes is None:
+        errors.append("Missing required field: bounding_boxes")
+    elif not isinstance(bboxes, list):
+        errors.append("Invalid bounding_boxes: must be a list")
+    else:
+        for i, bbox in enumerate(bboxes):
+            if not isinstance(bbox, dict):
+                errors.append(f"bounding_boxes[{i}]: must be a dict with xmin/ymin/xmax/ymax keys")
+                continue
+            for coord in ("xmin", "ymin", "xmax", "ymax"):
+                val = bbox.get(coord)
+                if val is None:
+                    errors.append(f"bounding_boxes[{i}]: missing key '{coord}'")
+                elif not isinstance(val, (int, float)) or not (0.0 <= val <= 1.0):
+                    errors.append(f"bounding_boxes[{i}].{coord}: must be float 0.0–1.0, got {val}")
+
+    region = record.get("region", "")
+    if region and region not in ("Souss-Massa", "Gharb"):
+        errors.append(f"Invalid region '{region}': must be 'Souss-Massa' or 'Gharb'")
+
+    return len(errors) == 0, errors
 
 
 from app.image_prefilter import validate_image_quality
+from app.config import (
+    PHASE_2_2B_ACTIVE,
+    IAV_MILESTONE_THRESHOLD,
+    FAIL_CLOSED_CONFIDENCE_THRESHOLD,
+    TEMPERATURE_SCALING_PARAM,
+)
+
+
+def check_phase_22b_milestone(manifest_path: Optional[str] = None) -> bool:
+    """
+    Checks if the IAV Hassan II dataset milestone trigger (>= 500 verified Moroccan field photos
+    per target disease class) has been reached.
+
+    Target disease classes:
+        Tomatoes: tuta_absoluta, phytophthora_infestans, alternaria_solani, tylcv, early_blight
+        Citrus: citrus_canker, citrus_aphids, spider_mites, hlb, alternaria_leaf_spot
+
+    Returns:
+        True if all target classes have at least IAV_MILESTONE_THRESHOLD samples; False otherwise.
+    """
+    target_diseases = [
+        "tuta_absoluta", "phytophthora_infestans", "alternaria_solani", "tylcv", "early_blight",
+        "citrus_canker", "citrus_aphids", "spider_mites", "hlb", "alternaria_leaf_spot"
+    ]
+    path = manifest_path or os.path.join("data", "iav_dataset_manifest.json")
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        records = data.get("records", [])
+        counts: Dict[str, int] = {d: 0 for d in target_diseases}
+        for rec in records:
+            code = str(rec.get("disease_onssa_code", "")).lower()
+            for d in target_diseases:
+                if d in code:
+                    counts[d] += 1
+        return all(counts[d] >= IAV_MILESTONE_THRESHOLD for d in target_diseases)
+    except Exception:
+        return False
+
 
 
 async def perform_cropdoctor_triage(
@@ -93,15 +221,28 @@ async def perform_cropdoctor_triage(
     force_unreadable: bool = False,
     force_confidence: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Analyze leaf photo via Gemini 1.5 Flash vision (or mock fallback) and return diagnostic response payload."""
-    
+    """
+    Analyze leaf photo via the 2-stage vision pipeline and return diagnostic response payload.
+
+    Phase 2.2a (default, PHASE_2_2B_ACTIVE=false):
+        - Stage 1: OpenCV Quality Gate (blur, resolution, foliage coverage).
+        - Stage 2: Zero-Shot Gemini 1.5 Flash + ONSSA Registry RAG.
+
+    Phase 2.2b (PHASE_2_2B_ACTIVE=true, when IAV milestone ≥500 photos/class reached):
+        - Stage 1: OpenCV Quality Gate (same heuristics).
+        - Stage 2: Fine-tuned EfficientNet-B4 with Temperature Scaling Calibration.
+        - Fail-closed: calibrated confidence < FAIL_CLOSED_CONFIDENCE_THRESHOLD suppresses
+          chemical active ingredient names.
+    """
     # Check for explicit unreadable image flag or dummy byte signature
     if force_unreadable or image_bytes in (b"unreadable_image", b"non_plant"):
         return {
             "pathogen_identified": "unreadable",
             "symptom_name": None,
             "confidence_score": 0.0,
+            "calibrated_confidence": 0.0,
             "confidence_tier": None,
+            "fail_closed_active": False,
             "onssa_product_pointer": None,
             "disclaimer_included": False,
             "is_unreadable": True,
@@ -132,7 +273,9 @@ async def perform_cropdoctor_triage(
                 "pathogen_identified": "unreadable",
                 "symptom_name": None,
                 "confidence_score": 0.0,
+                "calibrated_confidence": 0.0,
                 "confidence_tier": None,
+                "fail_closed_active": False,
                 "onssa_product_pointer": None,
                 "disclaimer_included": False,
                 "is_unreadable": True,
@@ -141,7 +284,7 @@ async def perform_cropdoctor_triage(
                 "prefilter_metrics": quality_result.metrics.model_dump() if quality_result.metrics else None,
             }
 
-        # Try real Gemini 1.5 Flash vision call
+        # Try real Gemini 1.5 Flash vision call (Phase 2.2a interim zero-shot engine)
 
         try:
             import importlib
@@ -169,7 +312,9 @@ async def perform_cropdoctor_triage(
                         "pathogen_identified": "unreadable",
                         "symptom_name": None,
                         "confidence_score": 0.0,
+                        "calibrated_confidence": 0.0,
                         "confidence_tier": None,
+                        "fail_closed_active": False,
                         "onssa_product_pointer": None,
                         "disclaimer_included": False,
                         "is_unreadable": True,
@@ -184,12 +329,14 @@ async def perform_cropdoctor_triage(
             else:
                 raise ValueError("Empty response from Gemini vision model")
         except Exception:
-            # Safe exception fallback: return unreadable response asking for clear photo (FR-023)
+            # Safe exception fallback: return unreadable response asking for clear photo
             return {
                 "pathogen_identified": "unreadable",
                 "symptom_name": None,
                 "confidence_score": 0.0,
+                "calibrated_confidence": 0.0,
                 "confidence_tier": None,
+                "fail_closed_active": False,
                 "onssa_product_pointer": None,
                 "disclaimer_included": False,
                 "is_unreadable": True,
@@ -199,30 +346,45 @@ async def perform_cropdoctor_triage(
                 ),
             }
 
-    # Tiered confidence rules
-    if confidence_score >= 0.75:
+    # Temperature Scaling Calibration
+    # Phase 2.2a: temperature = 1.0 (passthrough, raw confidence used as-is from Gemini)
+    # Phase 2.2b: temperature from TEMPERATURE_SCALING_PARAM (calibrates EfficientNet-B4 logits)
+    temperature = TEMPERATURE_SCALING_PARAM if PHASE_2_2B_ACTIVE else 1.0
+    calibrated_confidence = apply_temperature_scaling(confidence_score, temperature)
+
+    # Fail-closed threshold: if calibrated confidence < 0.75, suppress chemical active ingredients
+    fail_closed = calibrated_confidence < FAIL_CLOSED_CONFIDENCE_THRESHOLD
+
+    # Tiered confidence rules using calibrated confidence
+    if calibrated_confidence >= FAIL_CLOSED_CONFIDENCE_THRESHOLD:
         tier = "high"
         onssa_product = lookup_onssa_product(crop_type, pathogen_key)
-        product_text = f"Suggested treatment class: {onssa_product}" if onssa_product else "Consult an ONSSA-authorized retailer for suitable products."
+        if onssa_product:
+            product_text = f"Suggested treatment class: {onssa_product}"
+        else:
+            product_text = (
+                "Consult an ONSSA-authorized retailer for suitable products.\n"
+                "*Note: target vision support currently focuses on Tomatoes and Citrus.*"
+            )
         response_msg = (
             f"🍃 *CropDoctor Diagnosis (High Confidence)*\n"
             f"Identified issue: {symptom_name_fr}\n"
             f"{product_text}\n\n"
             f"⚠️ {ONSSA_DISCLAIMER}"
         )
-    elif confidence_score >= 0.50:
+    elif calibrated_confidence >= 0.50:
         tier = "medium"
-        onssa_product = lookup_onssa_product(crop_type, pathogen_key)
-        product_text = f"Suggested treatment class: {onssa_product}" if onssa_product else "Consult an ONSSA-authorized retailer for suitable products."
+        onssa_product = None  # Fail-closed: no chemical names below 0.75
         response_msg = (
             f"🍃 *CropDoctor Diagnosis (Likely Issue)*\n"
             f"Likely issue: {symptom_name_fr}\n"
-            f"{product_text}\n\n"
+            f"Focus on cultural practices (improving airflow, reducing surface wetness) "
+            f"and consult a local agronomist for authorized treatment options.\n\n"
             f"⚠️ {ONSSA_DISCLAIMER}"
         )
     else:
         tier = "low"
-        onssa_product = None  # NO chemical product name on Low confidence
+        onssa_product = None  # Fail-closed: no chemical product name on Low confidence
         response_msg = (
             f"🍃 *CropDoctor Observation*\n"
             f"Possible signs of leaf discoloration detected, but unable to confirm diagnosis.\n"
@@ -234,7 +396,9 @@ async def perform_cropdoctor_triage(
         "pathogen_identified": pathogen_key,
         "symptom_name": symptom_name_fr,
         "confidence_score": confidence_score,
+        "calibrated_confidence": calibrated_confidence,
         "confidence_tier": tier,
+        "fail_closed_active": fail_closed,
         "onssa_product_pointer": onssa_product,
         "disclaimer_included": True,
         "is_unreadable": False,
