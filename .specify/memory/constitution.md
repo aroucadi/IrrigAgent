@@ -1,8 +1,8 @@
 <!--
 ### Sync Impact Report
-- Version change: 1.4.0 → 1.5.0
+- Version change: 1.6.0 → 1.6.1
 - Modified principles:
-  - Section VIII (Quality, Security & Automated Verification Gates): Added mandatory No-Facade Rule requiring that core external API/model calls must not contain reachable hardcoded or synthetic default paths outside explicit test fixtures, and every "Completed & Verified" claim must include a passing test that fails if the mock path is hit with production-shaped input.
+  - Section VIII (Quality, Security & Automated Verification Gates): Reinforced No-Facade Rule formulation requiring that no feature may be marked "Completed & Verified" if its core external API/model call has a hardcoded or synthetic default path reachable in production, with mandatory tests failing when realistic input hits that path.
 - Added sections: None
 - Removed sections: None
 - Templates requiring updates:
@@ -45,8 +45,8 @@ Any feature request or code addition introducing non-permitted cut list capabili
 ### VI. End-to-End Demoability
 Every feature in scope MUST be testable and demoable end-to-end with a real WhatsApp test recipient number before being considered complete.
 
-### VII. Infrastructure as Code (NON-NEGOTIABLE)
-All GCP infrastructure components (Cloud Run, Firestore, Cloud Scheduler, Secret Manager, IAM) MUST be defined as Infrastructure as Code using Terraform/HCL or TypeScript (e.g., Pulumi/CDKTF). Manual GCP Console configuration ("clicking") is strictly prohibited for production and staging environments to ensure reproducibility, auditability, and zero configuration drift.
+### VII. Infrastructure Management & Deployment Path (NON-NEGOTIABLE)
+All v1 pilot application deployments MUST use GCP Cloud Run CLI (`gcloud run deploy`) per PRD Section 15.11. Declarative Infrastructure as Code (`infra/*.tf`) is explicitly deferred for post-selection environment scaling and is removed from the active build to eliminate scope drift and false-positive completion metrics. Manual GCP Console configuration ("clicking") remains strictly prohibited for production and staging environments to ensure auditability and zero configuration drift.
 
 ### VIII. Quality, Security & Automated Verification Gates (NON-NEGOTIABLE)
 All development and feature deliverables MUST satisfy mandatory automated verification and security controls:
@@ -55,13 +55,13 @@ All development and feature deliverables MUST satisfy mandatory automated verifi
 - **Zero Secrets in Code**: Hardcoding, staging, or committing plain-text API keys, Google Cloud service account JSON credentials, or Meta WhatsApp tokens is strictly forbidden.
 - **Mandatory Pre-Commit Gate Enforcement**: All local commits MUST execute and pass automated pre-commit hook checks enforcing secret scanning, fast unit tests (execution time < 3.0 seconds), and static linting/formatting (`ruff`, `black`).
 - **Automated Verification Standard**: Every major feature specification MUST explicitly define acceptance criteria that can be verified deterministically via automated test assertions or endpoint health/swagger checks.
-- **No-Facade Rule for External Integrations**: No feature may be marked Completed if its core external API/model call has a hardcoded or synthetic default path reachable outside explicit test fixtures. Every "Completed & Verified" claim MUST include a passing test that fails if the mock path is hit with production-shaped input.
+- **No-Facade Rule for External Integrations**: No feature may be marked "Completed & Verified" if its core external API/model call has a hardcoded or synthetic default path reachable in production. Every completion claim MUST include a test that fails when realistic (non-fixture) input hits that path with the mock still in place.
 
 ## Technical & Architectural Constraints
 
 - **Messaging Infrastructure**: Meta WhatsApp Cloud API Sandbox tier only (max 5 verified recipient phone numbers).
 - **Backend Stack**: Python 3.11+, FastAPI web service deployed on GCP Cloud Run.
-- **Infrastructure Provisioning**: Terraform/HCL or TypeScript for all GCP resources (Cloud Run, Firestore, Cloud Scheduler, Secret Manager, IAM).
+- **Infrastructure Provisioning**: GCP Cloud Run CLI (`gcloud run deploy`) for v1 pilot deployment; Terraform HCL deferred post-selection.
 - **Data Persistence**: Firestore for farm profiles and interaction logs only; flat, lightweight schemas.
 - **External Integrations**: Open-Meteo API for daily weather/ET₀ data; Gemini 1.5 Flash via Vertex AI for leaf photo triage; Google Cloud Text-to-Speech API (`ar-MA`) for optional Darija voice teaser notes.
 - **Resource Constraints**: Designed for solo founder execution within GCP credit limits ($10k hackathon credits).
@@ -82,4 +82,4 @@ All development and feature deliverables MUST satisfy mandatory automated verifi
   - **MINOR**: Addition of new principles, expanded scope boundaries, or governance rules.
   - **PATCH**: Clarifications, formatting, typo corrections, and non-semantic refinements.
 
-**Version**: 1.5.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-30
+**Version**: 1.6.1 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-31
