@@ -1,15 +1,15 @@
 # IrrigAgent AI — Full Product Roadmap & Jira-Style Backlog
 
 **Last Updated:** 2026-07-31  
-**Source Baseline:** Reconciled from `PRD.md` (v0.4), `PRDvNext.md`, `backlog.md`, `backlogv2.md`, all 18 feature specifications in `specs/001` through `specs/018`, and empirical runtime test suite verification (188/188 passing tests across 26 test modules).  
+**Source Baseline:** Reconciled from `PRD.md` (v0.4), `PRDvNext.md`, `backlog.md`, `backlogv2.md`, all 19 feature specifications in `specs/001` through `specs/019`, and empirical runtime test suite verification (188/188 passing tests across 26 test modules + empirical verification log).  
 **Export Note:** This document is formatted as a standard Markdown table for direct preview and seamless conversion/import into Jira (CSV export).
 
 ---
 
 ## 📊 Summary Metrics
 
-- **Total Backlog Items:** 49
-- **Done (Implemented & Verified):** 41
+- **Total Backlog Items:** 50
+- **Done (Implemented & Verified):** 42
 - **In Progress:** 0 (Codebase 100% feature-complete for v1.0)
 - **To Do (Pre-Demo Final Non-Code Task):** 1 (IRRIG-046: Record StartGate Demo Video)
 - **Backlog (Post-Selection / v1.1 / v2 / v3):** 7
@@ -70,13 +70,14 @@
 | IRRIG-047 | Feature | Multi-Farm Recommendation Batch Execution Fault Isolation | Ensures single-farm weather lookup or delivery failures during daily batch runs (`POST /jobs/daily-recommendations`) do not halt batch execution for remaining farms. Sourced from Spec 013 (US2). | v1.0 (MVP Polish) | Done |
 | IRRIG-048 | Feature | Pydantic v2 Data Models & Strict Schema Validation | Centralized data model schemas (`app/schemas.py`) for farm profiles, weather payloads, decision intents, telemetry payloads, and WhatsApp webhooks with strict Pydantic v2 typing. Sourced from Spec 002. | v0.5 (Security Gate) | Done |
 | IRRIG-049 | Feature | Internal Engagement & Traction Dashboard (Sales Evidence Tool) | Standalone local report generator & chart exporter (`scripts/generate_engagement_report.py`) querying Firestore read-only to produce screen-shareable sales evidence with small-sample directional data governance labeling (<5 active farms). Sourced from Spec 018. | v1.0 (MVP Polish) | Done |
+| IRRIG-050 | Task | Pre-Conversation Production Readiness Verification | Operational verification auditing Meta 24h window compliance, interactive button callbacks, opt-out batch exclusion, and engagement dashboard labeling against live infrastructure. Sourced from Spec 019. | v1.0 (MVP Polish) | Done |
 
 ---
 
 ## 🎯 Release Horizons Breakdown
 
 ### 🟢 Version 0.4 - 1.0 Codebase (100% Implemented & Verified Baseline)
-Includes all initial MVP features, security gates, ONSSA scraper, FAO-56 $ET_c$ math, Sentinel-2 NDVI heatmaps, Gemini Darija Voice STT, Meta WhatsApp 24h Window compliance, interactive quick reply buttons, `/help` menu system, opt-out mechanisms, sensor fusion telemetry ingestion & calibration, internal engagement & traction dashboard, and P0/code smell bug resolutions (BUG-001 through BUG-004, CRIT-006, CRIT-007, SMELL-001 through SMELL-003). All **41 code items marked `Done`** are fully covered by automated unit & integration tests (**188 passing tests**).
+Includes all initial MVP features, security gates, ONSSA scraper, FAO-56 $ET_c$ math, Sentinel-2 NDVI heatmaps, Gemini Darija Voice STT, Meta WhatsApp 24h Window compliance, interactive quick reply buttons, `/help` menu system, opt-out mechanisms, sensor fusion telemetry ingestion & calibration, internal engagement & traction dashboard, production readiness verification audit, and P0/code smell bug resolutions (BUG-001 through BUG-004, CRIT-006, CRIT-007, SMELL-001 through SMELL-003). All **42 items marked `Done`** are fully covered by automated unit & integration tests (**188 passing tests**) and empirical verification logs.
 
 
 ### 🟡 Version 1.0 (Pre-Demo & StartGate Submission Polish)
