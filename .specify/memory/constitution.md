@@ -1,8 +1,8 @@
 <!--
 ### Sync Impact Report
-- Version change: 1.6.0 → 1.6.1
+- Version change: 1.6.1 → 1.7.0
 - Modified principles:
-  - Section VIII (Quality, Security & Automated Verification Gates): Reinforced No-Facade Rule formulation requiring that no feature may be marked "Completed & Verified" if its core external API/model call has a hardcoded or synthetic default path reachable in production, with mandatory tests failing when realistic input hits that path.
+  - Section VIII (Quality, Security & Automated Verification Gates): Added No-Ambiguous-Mock-Fallback Rule (CRIT-007) prohibiting fallback or default values that match test-mode or mock-mode detection signals, requiring explicit loud failures on missing runtime values.
 - Added sections: None
 - Removed sections: None
 - Templates requiring updates:
@@ -56,6 +56,7 @@ All development and feature deliverables MUST satisfy mandatory automated verifi
 - **Mandatory Pre-Commit Gate Enforcement**: All local commits MUST execute and pass automated pre-commit hook checks enforcing secret scanning, fast unit tests (execution time < 3.0 seconds), and static linting/formatting (`ruff`, `black`).
 - **Automated Verification Standard**: Every major feature specification MUST explicitly define acceptance criteria that can be verified deterministically via automated test assertions or endpoint health/swagger checks.
 - **No-Facade Rule for External Integrations**: No feature may be marked "Completed & Verified" if its core external API/model call has a hardcoded or synthetic default path reachable in production. Every completion claim MUST include a test that fails when realistic (non-fixture) input hits that path with the mock still in place.
+- **No-Ambiguous-Mock-Fallback Rule (CRIT-007)**: No function may construct a fallback or default value that coincides with a string another function in the codebase treats as a test-mode or mock-mode signal. If a real value is missing at runtime, the system MUST fail loudly (log error and raise exception) and NEVER silently substitute a value that matches a test-detection pattern.
 
 ## Technical & Architectural Constraints
 
@@ -82,4 +83,4 @@ All development and feature deliverables MUST satisfy mandatory automated verifi
   - **MINOR**: Addition of new principles, expanded scope boundaries, or governance rules.
   - **PATCH**: Clarifications, formatting, typo corrections, and non-semantic refinements.
 
-**Version**: 1.6.1 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-31
+**Version**: 1.7.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-31
