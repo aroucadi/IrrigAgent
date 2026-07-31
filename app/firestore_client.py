@@ -21,6 +21,7 @@ _IN_MEMORY_TRIAGE_REQUESTS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_PIN_SESSIONS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_FARM_PARCELS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_PENDING_INTENTS: Dict[str, Dict[str, Any]] = {}
+_IN_MEMORY_INBOUND_TIMESTAMPS: Dict[str, str] = {}
 
 _db_client = None
 
@@ -404,4 +405,45 @@ async def delete_pending_intent(phone_number: str) -> None:
         except Exception:
             pass
     _IN_MEMORY_PENDING_INTENTS.pop(phone_number, None)
+
+
+async def save_inbound_timestamp(phone_number: str, timestamp_str: Optional[str] = None) -> str:
+    """Save ISO-8601 UTC timestamp of last inbound message received from user."""
+    if not timestamp_str:
+        timestamp_str = datetime.now(timezone.utc).isoformat()
+    
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_profiles").document(phone_number)
+            await doc_ref.set({"last_inbound_timestamp": timestamp_str}, merge=True)
+        except Exception:
+            pass
+            
+    _IN_MEMORY_INBOUND_TIMESTAMPS[phone_number] = timestamp_str
+    if phone_number in _IN_MEMORY_FARM_PROFILES:
+        _IN_MEMORY_FARM_PROFILES[phone_number]["last_inbound_timestamp"] = timestamp_str
+    return timestamp_str
+
+
+async def get_inbound_timestamp(phone_number: str) -> Optional[str]:
+    """Retrieve ISO-8601 UTC timestamp of last inbound message received from user."""
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_profiles").document(phone_number)
+            doc = await doc_ref.get()
+            if doc.exists:
+                data = doc.to_dict()
+                if "last_inbound_timestamp" in data:
+                    return data["last_inbound_timestamp"]
+        except Exception:
+            pass
+            
+    if phone_number in _IN_MEMORY_INBOUND_TIMESTAMPS:
+        return _IN_MEMORY_INBOUND_TIMESTAMPS[phone_number]
+    if phone_number in _IN_MEMORY_FARM_PROFILES:
+        return _IN_MEMORY_FARM_PROFILES[phone_number].get("last_inbound_timestamp")
+    return None
+
 

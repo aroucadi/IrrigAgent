@@ -1,5 +1,6 @@
 import httpx
-from typing import Optional, Dict, Any
+from datetime import datetime, timezone, timedelta
+from typing import Optional, Dict, Any, List, Union
 from app.config import WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, GRAPH_API_VERSION
 
 GRAPH_BASE_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
@@ -155,4 +156,100 @@ async def send_image_message(to: str, media_id: str, caption: Optional[str] = No
         resp = await client.post(MESSAGES_URL, headers=headers, json=payload)
         resp.raise_for_status()
         return resp.json()
+
+
+def is_user_in_24h_window(last_inbound_timestamp: Optional[Union[datetime, str]], now: Optional[datetime] = None) -> bool:
+    """Evaluate whether last inbound timestamp is within active 24-hour customer service window."""
+    if not last_inbound_timestamp:
+        return False
+        
+    if isinstance(last_inbound_timestamp, str):
+        try:
+            dt = datetime.fromisoformat(last_inbound_timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+    else:
+        dt = last_inbound_timestamp
+        
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+        
+    current_now = now or datetime.now(timezone.utc)
+    if current_now.tzinfo is None:
+        current_now = current_now.replace(tzinfo=timezone.utc)
+        
+    elapsed = current_now - dt
+    return timedelta(seconds=0) <= elapsed <= timedelta(hours=24)
+
+
+async def send_template_message(
+    to: str,
+    template_name: str = "daily_irrigation_advisory",
+    language_code: str = "fr",
+    parameters: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Send a pre-approved WhatsApp Message Template via Meta Cloud API."""
+    if _is_mock_token(WHATSAPP_TOKEN):
+        return {"messaging_product": "whatsapp", "contacts": [{"wa_id": to}], "messages": [{"id": "mock_wamid_template_999"}]}
+
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    
+    components = []
+    if parameters:
+        body_params = [{"type": "text", "text": str(p)} for p in parameters]
+        components.append({"type": "body", "parameters": body_params})
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {"code": language_code},
+            "components": components,
+        },
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(MESSAGES_URL, headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json()
+
+
+def is_meta_window_expired_error(exception: Exception) -> bool:
+    """Check if exception represents Meta Cloud API error code 131026 (Customer Service Window Expired)."""
+    if isinstance(exception, httpx.HTTPStatusError) and exception.response is not None:
+        try:
+            data = exception.response.json()
+            err_code = data.get("error", {}).get("code")
+            if err_code == 131026:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+async def send_message_with_window_fallback(
+    to: str,
+    text_body: str,
+    template_name: str = "daily_irrigation_advisory",
+    language_code: str = "fr",
+    parameters: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Attempt free-form text delivery; fallback to template delivery if Meta error 131026 is caught."""
+    try:
+        return await send_text_message(to, text_body)
+    except Exception as e:
+        if is_meta_window_expired_error(e):
+            return await send_template_message(
+                to=to,
+                template_name=template_name,
+                language_code=language_code,
+                parameters=parameters,
+            )
+        raise
+
+
 

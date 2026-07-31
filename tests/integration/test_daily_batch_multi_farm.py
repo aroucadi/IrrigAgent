@@ -52,6 +52,7 @@ async def test_daily_batch_multi_farm_differentiation():
         patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A, FARM_PROFILE_B])),
         patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
         patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")) as mock_save,
+        patch("app.main.is_user_in_24h_window", return_value=True),
         patch("app.main.send_text_message", new=AsyncMock(return_value={"status": "sent"})) as mock_send,
     ):
         response = client.post(
@@ -90,6 +91,7 @@ async def test_daily_batch_single_farm_failure_resilience():
         patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A, FARM_PROFILE_B])),
         patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
         patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")) as mock_save,
+        patch("app.main.is_user_in_24h_window", return_value=True),
         patch("app.main.send_text_message", new=AsyncMock(side_effect=mock_send_message_side_effect)) as mock_send,
     ):
         response = client.post(
@@ -117,6 +119,7 @@ async def test_daily_batch_all_farms_failure_resilience():
         patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A, FARM_PROFILE_B])),
         patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
         patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")),
+        patch("app.main.is_user_in_24h_window", return_value=True),
         patch("app.main.send_text_message", new=AsyncMock(side_effect=RuntimeError("Global network outage"))),
     ):
         response = client.post(
@@ -129,3 +132,24 @@ async def test_daily_batch_all_farms_failure_resilience():
         assert data["status"] == "success"
         assert data["dispatched_count"] == 0
         assert data["failed_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_daily_batch_template_message_when_window_closed():
+    """Verify daily batch job uses send_template_message when 24h window is closed."""
+    with (
+        patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A])),
+        patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
+        patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")),
+        patch("app.main.is_user_in_24h_window", return_value=False),
+        patch("app.main.send_template_message", new=AsyncMock(return_value={"status": "sent"})) as mock_send_template,
+    ):
+        response = client.post(
+            "/jobs/daily-recommendations",
+            headers={"Authorization": f"Bearer {JOB_SECRET_TOKEN}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["dispatched_count"] == 1
+        assert mock_send_template.call_count == 1
+

@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 from app.fao56 import calculate_crop_etc
 from app.config import HEAT_WARNING_TEMP_C, FROST_WARNING_TEMP_C
 
@@ -206,6 +206,19 @@ async def process_voice_note(
         "3 - Modify"
     )
     return fallback, False
+
+
+def format_advisory_template_params(
+    farm_name: str,
+    et0_val: float,
+    duration_str: str = "45 min"
+) -> List[str]:
+    """Format positional parameters [{{1}} farm_name, {{2}} ET0, {{3}} duration] for Meta WhatsApp UTILITY template."""
+    return [
+        str(farm_name or "Ferme Hassan"),
+        f"{et0_val:.1f} mm",
+        str(duration_str)
+    ]
 
 
 async def process_pending_intent_reply(phone_number: str, text_body: str) -> Tuple[bool, str]:

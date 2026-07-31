@@ -11,12 +11,15 @@ from app.whatsapp import (
     upload_media,
     extract_incoming_message,
     download_media,
+    send_template_message,
+    is_user_in_24h_window,
 )
 from app.weather import get_et0_forecast
 from app.decision import (
     evaluate_irrigation_recommendation,
     process_voice_note,
     process_pending_intent_reply,
+    format_advisory_template_params,
 )
 from app.regex_parser import (
     parse_modification_text,
@@ -44,6 +47,8 @@ from app.firestore_client import (
     delete_pin_session,
     save_farm_parcel,
     get_farm_parcel,
+    save_inbound_timestamp,
+    get_inbound_timestamp,
 )
 
 from app.schemas import (
@@ -116,6 +121,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "ignored"}
 
     sender = incoming["from"]
+    await save_inbound_timestamp(sender)
     msg_type = incoming["type"]
     text = (incoming.get("text") or "").strip()
     image_id = incoming.get("image_id")
@@ -423,9 +429,16 @@ async def trigger_daily_recommendations(
         }
         await save_recommendation(rec_record)
 
-        # 4. Dispatch WhatsApp text message
+        # 4. Check 24-hour window status to select transport mode (free-form vs. template)
         try:
-            await send_text_message(phone, rec_msg)
+            last_ts = await get_inbound_timestamp(phone)
+            if is_user_in_24h_window(last_ts):
+                await send_text_message(phone, rec_msg)
+            else:
+                farm_name = profile.get("farm_name", "Ferme Hassan")
+                et0_val = weather_data.get("et0", 4.5)
+                params = format_advisory_template_params(farm_name=farm_name, et0_val=et0_val, duration_str="45 min")
+                await send_template_message(to=phone, template_name="daily_irrigation_advisory", language_code="fr", parameters=params)
             dispatched_count += 1
             if ENABLE_DARIJA_VOICE_TEASER:
                 background_tasks.add_task(dispatch_darija_voice_teaser, phone, rec_msg)
