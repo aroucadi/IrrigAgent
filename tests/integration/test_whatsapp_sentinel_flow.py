@@ -5,13 +5,24 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.sentinel import SentinelSceneMetadata
 
+from app.firestore_client import save_farm_profile, _IN_MEMORY_FARM_PROFILES
+
 client = TestClient(app)
 
 
 def test_whatsapp_location_and_heatmap_full_flow():
     phone = "+212611223344"
+    _IN_MEMORY_FARM_PROFILES[phone] = {
+        "phone_number": phone,
+        "location": {"latitude": 30.4278, "longitude": -9.5981},
+        "crop_type": "tomatoes",
+        "acreage_hectares": 10.0,
+        "onboarding_incomplete": False,
+    }
+
 
     # 1. Trigger /parcel pin collection
+
     payload_start = {
         "object": "whatsapp_business_account",
         "entry": [{

@@ -269,3 +269,89 @@ async def test_voice_intent_api_failure_degradation():
         assert text == "ASR_FAILURE"
         assert action is None
 
+
+@pytest.mark.asyncio
+async def test_smell_001_markdown_fence_stripping():
+    """SMELL-001: Verify markdown code fence JSON parsing handles ```json and ``` fences without character stripping corruption."""
+    from unittest.mock import MagicMock, patch
+
+    mock_resp = MagicMock()
+    mock_resp.text = '```json\n{"transcribed_text": "Sqi 15 min", "confidence_score": 0.89, "intent_type": "MODIFY_IRRIGATION", "proposed_adjustment_minutes": 15}\n```'
+
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client_instance = mock_client_cls.return_value
+        mock_client_instance.models.generate_content.return_value = mock_resp
+
+        conf, text, action = await parse_voice_intent(b"sample_fence_audio", 10)
+        assert conf == 0.89
+        assert text == "Sqi 15 min"
+        assert action["proposed_adjustment_minutes"] == 15
+
+
+@pytest.mark.asyncio
+async def test_smell_003_direct_genai_import():
+    """SMELL-003: Verify direct static import of google.genai is used without importlib indirection."""
+    import app.decision as decision_module
+    assert hasattr(decision_module, "genai")
+    assert hasattr(decision_module, "types")
+
+
+def test_voice_confirmation_button_tap_equivalence():
+    """US1: Verify interactive button tap (CONFIRM_VOICE_INTENT) resolves identically to typed text '1'."""
+    client = TestClient(app)
+    
+    # 1. Send voice note webhook
+    voice_payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{
+            "id": "WHATSAPP_ACCOUNT_ID",
+            "changes": [{
+                "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {"display_phone_number": "15550431424", "phone_number_id": "105954558954427"},
+                    "messages": [{
+                        "from": "212688776655",
+                        "id": "wamid.voice123",
+                        "timestamp": "1722271800",
+                        "type": "audio",
+                        "audio": {"id": "mock_audio_media_123", "mime_type": "audio/ogg; codecs=opus", "seconds": 12}
+                    }]
+                },
+                "field": "messages"
+            }]
+        }]
+    }
+
+    resp1 = client.post("/webhook", json=voice_payload)
+    assert resp1.status_code == 200
+
+    # 2. Tap CONFIRM_VOICE_INTENT button
+    button_tap_payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{
+            "id": "WHATSAPP_ACCOUNT_ID",
+            "changes": [{
+                "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {"display_phone_number": "15550431424", "phone_number_id": "105954558954427"},
+                    "messages": [{
+                        "from": "212688776655",
+                        "id": "wamid.btn456",
+                        "timestamp": "1722271810",
+                        "type": "interactive",
+                        "interactive": {
+                            "type": "button_reply",
+                            "button_reply": {"id": "CONFIRM_VOICE_INTENT", "title": "Confirm"}
+                        }
+                    }]
+                },
+                "field": "messages"
+            }]
+        }]
+    }
+
+    resp2 = client.post("/webhook", json=button_tap_payload)
+    assert resp2.status_code == 200
+    assert resp2.json()["status"] == "pending_intent_reply_processed"
+
+

@@ -91,10 +91,13 @@ def extract_incoming_message(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
             button_map = {
                 "btn_approve": "1",
                 "btn_confirm": "1",
+                "CONFIRM_VOICE_INTENT": "1",
                 "btn_skip": "2",
                 "btn_cancel": "2",
+                "CANCEL_VOICE_INTENT": "2",
                 "btn_modify": "3",
                 "btn_discard": "3",
+                "DISCARD_VOICE_INTENT": "3",
             }
             text_body = button_map.get(button_id, button_id)
 
@@ -287,6 +290,57 @@ async def send_message_with_window_fallback(
                 parameters=parameters,
             )
         raise
+
+
+async def send_interactive_buttons_message(
+    to: str,
+    body: str,
+    buttons: List[Dict[str, str]],
+    header_text: Optional[str] = None
+) -> Dict[str, Any]:
+    """Send an interactive quick-reply button message via WhatsApp Cloud API.
+    
+    `buttons` is a list of dicts: [{"id": "btn_id", "title": "Button Title"}]
+    Note: Title strings MUST be <= 20 characters. Max 3 buttons per interactive payload.
+    """
+    if _is_mock_token(WHATSAPP_TOKEN):
+        return {"messaging_product": "whatsapp", "contacts": [{"wa_id": to}], "messages": [{"id": "mock_wamid_interactive_001"}]}
+
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    
+    formatted_buttons = []
+    for btn in buttons[:3]:
+        formatted_buttons.append({
+            "type": "reply",
+            "reply": {
+                "id": btn["id"],
+                "title": btn["title"][:20]
+            }
+        })
+
+    interactive_obj: Dict[str, Any] = {
+        "type": "button",
+        "body": {"text": body},
+        "action": {"buttons": formatted_buttons}
+    }
+    if header_text:
+        interactive_obj["header"] = {"type": "text", "text": header_text}
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": "interactive",
+        "interactive": interactive_obj,
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(MESSAGES_URL, headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json()
+
 
 
 

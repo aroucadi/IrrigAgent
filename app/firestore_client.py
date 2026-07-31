@@ -133,6 +133,45 @@ async def get_recommendation(rec_id: str) -> Optional[Dict[str, Any]]:
     return _IN_MEMORY_RECOMMENDATIONS.get(rec_id)
 
 
+async def update_farm_profile_opt_out(phone_number: str, opted_out: bool) -> Optional[Dict[str, Any]]:
+    """Update opted_out status of a farm profile in Firestore / in-memory store."""
+    update_data = {
+        "opted_out": opted_out,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_profiles").document(phone_number)
+            await doc_ref.set(update_data, merge=True)
+        except Exception:
+            pass
+    if phone_number in _IN_MEMORY_FARM_PROFILES:
+        _IN_MEMORY_FARM_PROFILES[phone_number].update(update_data)
+        return _IN_MEMORY_FARM_PROFILES[phone_number]
+    return None
+
+
+async def save_outcome_feedback(recommendation_id: str, feedback: str) -> Optional[Dict[str, Any]]:
+    """Persist farmer outcome feedback on an existing IrrigationRecommendation record."""
+    update_data = {
+        "outcome_feedback": feedback,
+        "outcome_updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("irrigation_recommendations").document(recommendation_id)
+            await doc_ref.set(update_data, merge=True)
+        except Exception:
+            pass
+    if recommendation_id in _IN_MEMORY_RECOMMENDATIONS:
+        _IN_MEMORY_RECOMMENDATIONS[recommendation_id].update(update_data)
+        return _IN_MEMORY_RECOMMENDATIONS[recommendation_id]
+    return None
+
+
+
 async def get_latest_recommendation_for_user(phone_number: str) -> Optional[Dict[str, Any]]:
     client = get_firestore_client()
     if client:

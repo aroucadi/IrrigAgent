@@ -1,7 +1,16 @@
 import json
+import re
 from typing import Dict, Any, Tuple, Optional, List
 from app.fao56 import calculate_crop_etc
 from app.config import HEAT_WARNING_TEMP_C, FROST_WARNING_TEMP_C
+
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    genai = None
+    types = None
+
 
 
 def evaluate_irrigation_recommendation(
@@ -126,6 +135,7 @@ async def parse_voice_intent(
         from google.genai import types
 
         client = genai.Client()
+
         prompt = (
             "Transcribe this audio voice note accurately. Extract the irrigation intent. "
             "Output strictly a raw JSON object with keys: "
@@ -141,13 +151,10 @@ async def parse_voice_intent(
         if response and response.text:
             cleaned = response.text.strip()
             if cleaned.startswith("```"):
-                lines = cleaned.splitlines()
-                if lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].startswith("```"):
-                    lines = lines[:-1]
-                cleaned = "\n".join(lines).strip()
+                cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+                cleaned = re.sub(r"\s*```$", "", cleaned)
             parsed = json.loads(cleaned)
+
             transcript = str(parsed.get("transcribed_text", ""))
             confidence = float(parsed.get("confidence_score", 0.0))
             intent_type = parsed.get("intent_type", "MODIFY_IRRIGATION")

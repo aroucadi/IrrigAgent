@@ -93,6 +93,10 @@ class FarmProfile(BaseModel):
     preferred_language: str = Field(default="french")
     planting_date: Optional[str] = None
     is_mature_orchard: bool = False
+    opted_out: bool = Field(default=False)
+    onboarding_incomplete: bool = Field(default=False)
+    onboarding_step: Optional[str] = Field(default="COMPLETED")
+    consent_accepted: bool = Field(default=True)
 
 
 class FAO56CropEntry(BaseModel):

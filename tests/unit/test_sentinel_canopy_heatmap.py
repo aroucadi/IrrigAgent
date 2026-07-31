@@ -252,3 +252,51 @@ def test_real_sentinel_distinct_inputs_produce_distinct_results():
     assert report_a.ndvi_mean != report_b.ndvi_mean
     assert report_a.healthy_percent == 100.0
     assert report_b.stressed_percent == 100.0
+
+
+def test_smell_002_sentinel2_out_shape_enforcement():
+    """SMELL-002: Verify fetch_sentinel2_bands forces out_shape on both red and nir band reads."""
+    bbox = [-9.5983, 30.4250, -9.5950, 30.4280]
+    scene = SentinelSceneMetadata(
+        scene_id="TEST_SCENE_SMELL002",
+        acquisition_date="2026-07-28",
+        cloud_cover_percent=2.0,
+        red_band_url="https://example.com/B04.tif",
+        nir_band_url="https://example.com/B08.tif",
+        catalog_source="element84"
+    )
+
+    mock_win = MagicMock()
+    mock_win.height = 42.4
+    mock_win.width = 58.7
+
+    mock_src_red = MagicMock()
+    mock_src_red.nodata = None
+    mock_src_red.transform = MagicMock()
+    mock_src_red.read.return_value = np.ones((42, 59), dtype=np.float32) * 1000.0
+    mock_src_red.__enter__.return_value = mock_src_red
+
+    mock_src_nir = MagicMock()
+    mock_src_nir.nodata = None
+    mock_src_nir.transform = MagicMock()
+    mock_src_nir.read.return_value = np.ones((42, 59), dtype=np.float32) * 5000.0
+    mock_src_nir.__enter__.return_value = mock_src_nir
+
+    def open_mock(path, **kwargs):
+        if "B04" in path:
+            return mock_src_red
+        return mock_src_nir
+
+    with patch("rasterio.open", side_effect=open_mock), \
+         patch("rasterio.windows.from_bounds", return_value=mock_win):
+        red, nir, date_str, cloud = fetch_sentinel2_bands(scene, bbox)
+        assert red.shape == (42, 59)
+        assert nir.shape == (42, 59)
+        assert red.shape == nir.shape
+        # Check out_shape argument was passed to BOTH read calls
+        assert mock_src_red.read.call_args[1].get("out_shape") == (42, 59)
+        assert mock_src_nir.read.call_args[1].get("out_shape") == (42, 59)
+
+
+
+

@@ -141,24 +141,28 @@ def fetch_sentinel2_bands(scene: SentinelSceneMetadata, bbox: list[float]) -> Tu
 
     min_lon, min_lat, max_lon, max_lat = bbox
 
-    # 1. Read Red Band (B04)
+    # 1. Read Red Band (B04) and NIR Band (B08) enforcing explicit matching out_shape
     with rasterio.open("/vsicurl/" + scene.red_band_url) as src_red:
         window = from_bounds(min_lon, min_lat, max_lon, max_lat, src_red.transform)
-        red_data = src_red.read(1, window=window).astype(np.float32)
+        win_height = max(1, int(round(window.height)))
+        win_width = max(1, int(round(window.width)))
+        target_out_shape = (win_height, win_width)
+
+        red_data = src_red.read(1, window=window, out_shape=target_out_shape).astype(np.float32)
         if src_red.nodata is not None:
             red_data[red_data == src_red.nodata] = np.nan
         red_data = red_data / 10000.0
 
-    # 2. Read NIR Band (B08) - pass out_shape matching Red band to prevent bounding box 1-pixel rounding mismatch
+    # 2. Read NIR Band (B08) - pass target_out_shape matching Red band
     with rasterio.open("/vsicurl/" + scene.nir_band_url) as src_nir:
         window = from_bounds(min_lon, min_lat, max_lon, max_lat, src_nir.transform)
-        target_out_shape = (red_data.shape[0], red_data.shape[1])
         nir_data = src_nir.read(1, window=window, out_shape=target_out_shape).astype(np.float32)
         if src_nir.nodata is not None:
             nir_data[nir_data == src_nir.nodata] = np.nan
         nir_data = nir_data / 10000.0
 
     return red_data, nir_data, scene.acquisition_date, scene.cloud_cover_percent
+
 
 
 
