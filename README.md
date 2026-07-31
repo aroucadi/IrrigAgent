@@ -67,8 +67,7 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 - **AI Vision**: Gemini 1.5 Flash via Vertex AI
 - **Audio Output**: Google Cloud Text-to-Speech (`ar-MA` Moroccan Arabic, OGG/OPUS)
 - **Data & Storage**: Google Cloud Firestore (Native Mode) + Local ONSSA Registry Dataset JSON
-- **Infrastructure as Code (IaC)**: Modular Terraform HCL under `infra/` (`main.tf`, `variables.tf`, `outputs.tf`, `cloud_run.tf`, `secrets.tf`, `scheduler.tf` set to **18:45 Africa/Casablanca**)
-- **Automated CI/CD**: GitHub Actions deployment workflow ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) automating Docker build/push to GCP Artifact Registry and non-interactive `terraform apply`
+- **Deployment Path**: GCP Cloud Run CLI (`gcloud run deploy`) per PRD Section 15.11 (Declarative Terraform IaC deferred post-selection per Constitution v1.6.0)
 
 ---
 
@@ -76,14 +75,14 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 
 This project is built following GitHub's [spec-kit](https://github.com/github/spec-kit) spec-driven workflow:
 
-- **Constitution (v1.4.0)**: [.specify/memory/constitution.md](.specify/memory/constitution.md)
+- **Constitution (v1.6.0)**: [.specify/memory/constitution.md](.specify/memory/constitution.md)
   - **Human-in-the-loop strictly enforced** (No automated valve/hardware control in v1)
   - **Rule-based logic first** before LLM upgrades
   - **Mandatory ONSSA disclaimer** on all CropDoctor responses
   - **Sandbox messaging tier only** (Max 5 test numbers)
-  - **Voice Scope Note**: Optional TTS voice output permitted behind feature flag `ENABLE_DARIJA_VOICE_TEASER=true` sequenced after core text loop validation; voice input (transcription/ASR) strictly out of scope
-  - **Infrastructure as Code (Principle VII)**: 100% of GCP cloud resources provisioned declaratively via Terraform (0 manual GCP Console edits)
-  - **Quality & Security Gates (Principle VIII)**: Zero-broken-tests policy, deterministic calculation/parsing test coverage, zero secrets in code, and mandatory pre-commit hooks
+  - **Voice Scope Note**: Optional TTS voice output permitted behind feature flag `ENABLE_DARIJA_VOICE_TEASER=true` sequenced after core text loop validation; voice ASR input wired in spec 012
+  - **Deployment Path (Principle VII)**: All v1 pilot deployments executed via `gcloud run deploy` CLI; Terraform IaC deferred post-selection (Option A)
+  - **Quality & Security Gates (Principle VIII)**: Zero-broken-tests policy, deterministic calculation/parsing test coverage, zero secrets in code, No-Facade rule for API calls, and mandatory pre-commit hooks
 
 ### 📁 Feature Design Artifacts
 
@@ -119,7 +118,6 @@ This project is built following GitHub's [spec-kit](https://github.com/github/sp
 
 ### Prerequisites
 - Python 3.11+
-- HashiCorp Terraform 1.5+
 - Meta Developer Account (WhatsApp Cloud API App in Sandbox)
 - GCP Project with Cloud Run, Firestore, Secret Manager, Cloud Scheduler, Vertex AI & Cloud Text-to-Speech enabled
 
@@ -138,7 +136,7 @@ powershell -ExecutionPolicy Bypass -File scripts/install-hooks.ps1
 
 ### 2. Verification Commands
 ```bash
-# Run full automated test suite (40 tests)
+# Run full automated test suite
 pytest
 
 # Manually trigger pre-commit gate check
@@ -146,12 +144,10 @@ bash scripts/pre-commit.sh
 # Or on Windows PowerShell:
 powershell -ExecutionPolicy Bypass -File scripts/pre-commit.ps1
 
-# Validate Terraform IaC module syntax
-terraform -chdir=infra validate
-
-# Dry-run Terraform execution plan
-terraform -chdir=infra plan -var="project_id=your-gcp-project-id"
+# Pilot Deployment via Cloud Run CLI
+gcloud run deploy irrigagent --source . --region europe-west1
 ```
+
 
 ---
 

@@ -14,7 +14,7 @@ async def get_et0_forecast(latitude: float, longitude: float) -> Tuple[Dict[str,
     params = {
         "latitude": latitude,
         "longitude": longitude,
-        "daily": ["et0_fao_evapotranspiration", "precipitation_sum", "temperature_2m_max"],
+        "daily": ["et0_fao_evapotranspiration", "precipitation_sum", "temperature_2m_max", "temperature_2m_min"],
         "timezone": "auto",
         "forecast_days": 2,
     }
@@ -30,16 +30,21 @@ async def get_et0_forecast(latitude: float, longitude: float) -> Tuple[Dict[str,
                     daily = data.get("daily", {})
                     et0_list = daily.get("et0_fao_evapotranspiration", [4.5, 4.5])
                     precip_list = daily.get("precipitation_sum", [0.0, 0.0])
-                    temp_list = daily.get("temperature_2m_max", [25.0, 25.0])
+                    temp_max_list = daily.get("temperature_2m_max", [25.0, 25.0])
+                    temp_min_list = daily.get("temperature_2m_min", [15.0, 15.0])
                     
                     et0_val = et0_list[1] if len(et0_list) > 1 else et0_list[0]
                     precip_val = precip_list[1] if len(precip_list) > 1 else precip_list[0]
-                    temp_val = temp_list[1] if len(temp_list) > 1 else temp_list[0]
+                    temp_max_val = temp_max_list[1] if len(temp_max_list) > 1 else temp_max_list[0]
+                    temp_min_val = temp_min_list[1] if len(temp_min_list) > 1 else temp_min_list[0]
                     
                     return {
                         "et0": float(et0_val or 4.5),
                         "precipitation_mm": float(precip_val or 0.0),
-                        "temp_max_c": float(temp_val or 25.0),
+                        "temp_max_c": float(temp_max_val or 25.0),
+                        "temp_min_c": float(temp_min_val or 15.0),
+                        "temperature_2m_max": float(temp_max_val or 25.0),
+                        "temperature_2m_min": float(temp_min_val or 15.0),
                     }, "fresh"
         except Exception:
             pass
@@ -52,4 +57,7 @@ async def get_et0_forecast(latitude: float, longitude: float) -> Tuple[Dict[str,
         "et0": 4.5,
         "precipitation_mm": 0.0,
         "temp_max_c": 26.0,
+        "temp_min_c": 15.0,
+        "temperature_2m_max": 26.0,
+        "temperature_2m_min": 15.0,
     }, "estimated"

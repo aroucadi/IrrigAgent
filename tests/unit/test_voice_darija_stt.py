@@ -222,3 +222,50 @@ def test_webhook_voice_note_endpoint_integration():
     resp2 = client.post("/webhook", json=reply_payload)
     assert resp2.status_code == 200
     assert resp2.json()["status"] == "pending_intent_reply_processed"
+
+
+@pytest.mark.asyncio
+async def test_anti_mock_regression_voice_intent():
+    """Verify parse_voice_intent produces dynamic outputs for different realistic mocked ASR responses (BUG-001)."""
+    from unittest.mock import MagicMock, patch
+
+    mock_response_1 = MagicMock()
+    mock_response_1.text = '{"transcribed_text": "Zid 20 dqiqa f l-sqi", "confidence_score": 0.92, "intent_type": "INCREASE_IRRIGATION", "proposed_adjustment_minutes": 20}'
+
+    mock_response_2 = MagicMock()
+    mock_response_2.text = '{"transcribed_text": "Nqs 10 dqiqa", "confidence_score": 0.85, "intent_type": "DECREASE_IRRIGATION", "proposed_adjustment_minutes": 10}'
+
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client_instance = mock_client_cls.return_value
+        mock_client_instance.models.generate_content.side_effect = [mock_response_1, mock_response_2]
+
+        conf1, text1, action1 = await parse_voice_intent(b"realistic_audio_payload_alpha", 15)
+        conf2, text2, action2 = await parse_voice_intent(b"realistic_audio_payload_beta", 15)
+
+        # Assert two dynamic inputs produced distinct transcripts & confidence scores
+        assert text1 == "Zid 20 dqiqa f l-sqi"
+        assert text2 == "Nqs 10 dqiqa"
+        assert text1 != text2
+        assert conf1 == 0.92
+        assert conf2 == 0.85
+        assert conf1 != conf2
+        assert action1["intent_type"] == "INCREASE_IRRIGATION"
+        assert action1["proposed_adjustment_minutes"] == 20
+        assert action2["intent_type"] == "DECREASE_IRRIGATION"
+        assert action2["proposed_adjustment_minutes"] == 10
+
+
+@pytest.mark.asyncio
+async def test_voice_intent_api_failure_degradation():
+    """Verify real API failure (timeout, exception) degrades safely to low confidence fallback."""
+    from unittest.mock import patch
+
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client_instance = mock_client_cls.return_value
+        mock_client_instance.models.generate_content.side_effect = Exception("Vertex AI API Timeout")
+
+        conf, text, action = await parse_voice_intent(b"real_audio_bytes_error_case", 15)
+        assert conf == 0.0
+        assert text == "ASR_FAILURE"
+        assert action is None
+

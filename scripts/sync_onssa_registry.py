@@ -21,8 +21,8 @@ from bs4 import BeautifulSoup
 
 USER_AGENT = "IrrigAgent-ONSSA-Sync/1.0 (+https://github.com/aroucadi/IrrigAgent)"
 DEFAULT_TARGET_URL = "https://eservice.onssa.gov.ma/IndPesticide.aspx"
-DEFAULT_OUTPUT_FILE = os.path.join("data", "onssa_authorized_products.json")
-CHECKPOINT_FILE = os.path.join("data", "onssa_authorized_products.checkpoint.json")
+DEFAULT_OUTPUT_FILE = os.path.join("data", "onssa_registry.json")
+CHECKPOINT_FILE = os.path.join("data", "onssa_registry.checkpoint.json")
 
 
 

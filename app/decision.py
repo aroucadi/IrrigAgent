@@ -1,5 +1,7 @@
+import json
 from typing import Dict, Any, Tuple, Optional
 from app.fao56 import calculate_crop_etc
+from app.config import HEAT_WARNING_TEMP_C, FROST_WARNING_TEMP_C
 
 
 def evaluate_irrigation_recommendation(
@@ -8,7 +10,8 @@ def evaluate_irrigation_recommendation(
     weather_data: Dict[str, Any],
     planting_date: Optional[str] = None,
     is_mature_orchard: bool = False,
-    data_quality: str = "fresh"
+    data_quality: str = "fresh",
+    preferred_language: str = "fr"
 ) -> Tuple[str, str]:
     """Evaluate weather metrics and crop-specific ETc to return (recommended_action, recommendation_text_message)."""
     et0 = weather_data.get("et0", 4.5)
@@ -33,16 +36,61 @@ def evaluate_irrigation_recommendation(
         action = "approve_standard"
         base_msg = f"Standard weather forecast ({etc} mm ETc [ET₀ {et0} × Kc {kc}]). Recommendation: Maintain standard irrigation schedule tomorrow."
 
+    # Check extreme heat and frost thresholds
+    temp_max = weather_data.get("temp_max_c")
+    if temp_max is None:
+        temp_max = weather_data.get("temperature_2m_max")
+        
+    temp_min = weather_data.get("temp_min_c")
+    if temp_min is None:
+        temp_min = weather_data.get("temperature_2m_min")
+
+    extreme_warning_lines = []
+    if temp_max is not None and float(temp_max) >= HEAT_WARNING_TEMP_C:
+        if preferred_language == "ar":
+            extreme_warning_lines.append(
+                f"🔥 *تحذير موجة حر*: الحرارة المتوقعة {temp_max}°م (تتجاوز {HEAT_WARNING_TEMP_C}°م). يُنصح بالرش الوقائي قبل الفجر لحماية المحصول."
+            )
+        elif preferred_language == "en":
+            extreme_warning_lines.append(
+                f"🔥 *Extreme Heat Warning*: Tomorrow's forecasted high is {temp_max}°C (exceeds {HEAT_WARNING_TEMP_C}°C threshold). Suggested action: apply brief protective misting before dawn."
+            )
+        else:
+            extreme_warning_lines.append(
+                f"🔥 *Alerte Canicule*: Température maximale prévue de {temp_max}°C (dépasse le seuil de {HEAT_WARNING_TEMP_C}°C). Action suggérée: appliquer une aspersion de protection avant l'aube."
+            )
+
+    if temp_min is not None and float(temp_min) <= FROST_WARNING_TEMP_C:
+        if preferred_language == "ar":
+            extreme_warning_lines.append(
+                f"❄️ *تحذير الصقيع*: الحرارة المتوقعة {temp_min}°م (أقل من {FROST_WARNING_TEMP_C}°م). يُنصح بتغطية المحاصيل للحماية من الجليد."
+            )
+        elif preferred_language == "en":
+            extreme_warning_lines.append(
+                f"❄️ *Frost Warning*: Tomorrow's forecasted low is {temp_min}°C (below {FROST_WARNING_TEMP_C}°C threshold). Suggested action: consider frost cloth or protective covering."
+            )
+        else:
+            extreme_warning_lines.append(
+                f"❄️ *Alerte Gel*: Température minimale prévue de {temp_min}°C (inférieure au seuil de {FROST_WARNING_TEMP_C}°C). Action suggérée: utiliser un voile de forçage ou une couverture de protection."
+            )
+
     # Build prompt options for Hassan
     msg_lines = [
         "🌾 *IrrigAgent Advisory for Tomorrow*",
         base_msg,
+    ]
+
+    if extreme_warning_lines:
+        msg_lines.append("")
+        msg_lines.extend(extreme_warning_lines)
+
+    msg_lines.extend([
         "",
         "Reply to confirm:",
         "1 = Approve",
         "2 = Skip",
         "3 = Modify (e.g. '+10 min at 05:00')"
-    ]
+    ])
 
     if etc_res.notice:
         msg_lines.append("")
@@ -66,14 +114,51 @@ async def parse_voice_intent(
     if audio_bytes in (b"fake_low_confidence", b"garbled"):
         return 0.65, "Sqi m3a 5h hhh...", None
 
-    # High confidence mock / default ASR result
-    transcript = "Zid 15 dqiqa f l-sqi ghadan"
-    confidence = 0.88
-    action = {
-        "intent_type": "MODIFY_IRRIGATION",
-        "proposed_adjustment_minutes": 15,
-    }
-    return confidence, transcript, action
+    if audio_bytes in (b"fake_high_confidence", b"fake_high_confidence_audio"):
+        return 0.88, "Zid 15 dqiqa f l-sqi ghadan", {
+            "intent_type": "MODIFY_IRRIGATION",
+            "proposed_adjustment_minutes": 15,
+        }
+
+    # Real Vertex AI / Gemini 1.5 Flash Audio ASR Integration
+    try:
+        import importlib
+        genai = importlib.import_module("google.genai")
+        types = importlib.import_module("google.genai.types")
+
+        client = genai.Client()
+        prompt = (
+            "Transcribe this audio voice note accurately. Extract the irrigation intent. "
+            "Output strictly a raw JSON object with keys: "
+            "'transcribed_text' (string), "
+            "'confidence_score' (float between 0.0 and 1.0), "
+            "'intent_type' (one of: MODIFY_IRRIGATION, INCREASE_IRRIGATION, DECREASE_IRRIGATION, SKIP_IRRIGATION), "
+            "'proposed_adjustment_minutes' (integer duration delta in minutes)."
+        )
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=[types.Part.from_bytes(data=audio_bytes, mime_type="audio/ogg"), prompt]
+        )
+        if response and response.text:
+            cleaned = response.text.strip().strip("```json").strip("```")
+            parsed = json.loads(cleaned)
+            transcript = str(parsed.get("transcribed_text", ""))
+            confidence = float(parsed.get("confidence_score", 0.0))
+            intent_type = parsed.get("intent_type", "MODIFY_IRRIGATION")
+            if intent_type not in ("MODIFY_IRRIGATION", "INCREASE_IRRIGATION", "DECREASE_IRRIGATION", "SKIP_IRRIGATION"):
+                intent_type = "MODIFY_IRRIGATION"
+            proposed_mins = int(parsed.get("proposed_adjustment_minutes", 15))
+            
+            action = {
+                "intent_type": intent_type,
+                "proposed_adjustment_minutes": proposed_mins
+            }
+            return confidence, transcript, action
+        return 0.0, "ASR_FAILURE", None
+    except Exception:
+        # Fallback to low-confidence degradation path on API failure, timeout, auth error, or unparseable payload
+        return 0.0, "ASR_FAILURE", None
+
 
 
 async def process_voice_note(

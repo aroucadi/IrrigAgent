@@ -66,7 +66,7 @@ def is_parcel_cancel_command(text: str) -> bool:
     if not text:
         return False
     raw = text.strip().lower()
-    return bool(re.search(r'^(?:/cancel|/reset|cancel)$', raw))
+    return bool(re.search(r'^(?:/cancel|/reset|cancel|reset|restart|restart boundary|reset boundary|recommencer|réinitialiser|بداية جديدة)$', raw))
 
 
 def is_heatmap_command(text: str) -> bool:

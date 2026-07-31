@@ -128,5 +128,6 @@
 
 ## Phase 7: Convergence
 
-- [ ] T015 Remove synthetic sine/cosine fallback in fetch_sentinel2_bands in app/sentinel.py per FR-012, Constitution VIII (contradicts)
+- [x] T015 Remove synthetic sine/cosine fallback in fetch_sentinel2_bands in app/sentinel.py per FR-012, Constitution VIII (contradicts)
+
 

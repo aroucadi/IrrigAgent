@@ -26,17 +26,18 @@ ONSSA_STATIC_CATALOG: Dict[str, Dict[str, str]] = {
 }
 
 
-_DATASET_PATH = os.path.join("data", "onssa_authorized_products.json")
+_DATASET_PATH = os.getenv("ONSSA_REGISTRY_PATH", os.path.join("data", "onssa_registry.json"))
 
 
 def _load_onssa_catalog() -> tuple[Dict[str, Dict[str, str]], str]:
     """
-    Attempts to load treatment catalog from data/onssa_authorized_products.json.
+    Attempts to load treatment catalog from data/onssa_registry.json.
     Falls back to ONSSA_STATIC_CATALOG if dataset file is absent, empty, or unreadable.
     """
-    if os.path.exists(_DATASET_PATH):
+    path = os.getenv("ONSSA_REGISTRY_PATH", _DATASET_PATH)
+    if os.path.exists(path):
         try:
-            with open(_DATASET_PATH, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             entries = data.get("entries", [])
             if entries:
@@ -58,7 +59,7 @@ def _load_onssa_catalog() -> tuple[Dict[str, Dict[str, str]], str]:
                             dynamic_catalog[c_key][p_key] = product_desc
 
                 if dynamic_catalog:
-                    return dynamic_catalog, _DATASET_PATH
+                    return dynamic_catalog, path
         except Exception:
             pass
             
@@ -70,19 +71,23 @@ def lookup_onssa_product(crop_type: str, pathogen_key: str) -> Optional[str]:
     crop_norm = crop_type.strip().lower()
     pathogen_norm = pathogen_key.strip().lower()
 
-    catalog, _ = _load_onssa_catalog()
+    catalog, catalog_source = _load_onssa_catalog()
     
-    # Try dynamic catalog search first
-    for c_key, pest_map in catalog.items():
-        if crop_norm in c_key or c_key in crop_norm or (crop_norm.startswith("tomat") and "tomat" in c_key) or (crop_norm.startswith("citrus") and "agrum" in c_key):
-            for p_key, prod in pest_map.items():
-                if pathogen_norm in p_key or p_key in pathogen_norm:
-                    return prod
-                    
-    # Fallback to static catalog
+    # Try dynamic catalog search first if dynamic dataset was loaded
+    if catalog_source != "ONSSA_STATIC_CATALOG":
+        for c_key, pest_map in catalog.items():
+            if crop_norm in c_key or c_key in crop_norm or (crop_norm.startswith("tomat") and "tomat" in c_key) or (crop_norm.startswith("citrus") and "agrum" in c_key):
+                for p_key, prod in pest_map.items():
+                    if pathogen_norm in p_key or p_key in pathogen_norm:
+                        return prod
+
+    # Fallback to static catalog (if no match in dynamic dataset or if dynamic dataset missing/malformed)
     crop_catalog = ONSSA_STATIC_CATALOG.get(crop_norm)
     if crop_catalog:
-        return crop_catalog.get(pathogen_norm)
+        match = crop_catalog.get(pathogen_norm)
+        if match:
+            return match
+
     return None
 
 

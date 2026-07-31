@@ -3,6 +3,18 @@ from typing import List, Dict, Tuple, Any
 from shapely.geometry import Polygon
 
 
+def calculate_haversine_distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate geodesic distance in meters between two WGS84 coordinate pairs."""
+    r_earth = 6371000.0  # Earth radius in meters
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
+    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+    return r_earth * c
+
+
 def calculate_shoelace_geodesic_area_ha(coordinates: List[Tuple[float, float]]) -> float:
     """Calculate precise surface area in hectares for WGS84 (lon, lat) polygon using Shoelace formula on geodesic projection."""
     if not coordinates or len(coordinates) < 3:
@@ -39,12 +51,22 @@ def calculate_shoelace_geodesic_area_ha(coordinates: List[Tuple[float, float]]) 
 
 
 def validate_parcel_polygon(pins: List[Dict[str, float]]) -> Tuple[bool, str, Dict[str, Any]]:
-    """Validate field corner pins, check polygon simplicity, and compute Shoelace area.
+    """Validate field corner pins, check pin proximity, check polygon simplicity, and compute Shoelace area.
     
     Returns (is_valid, error_message, geojson_dict).
     """
     if len(pins) < 3:
         return False, "At least 3 corner pins are required to form a field parcel boundary.", {}
+
+    # Check for pins implausibly close together (< 5 meters apart)
+    for i in range(len(pins)):
+        for j in range(i + 1, len(pins)):
+            dist_m = calculate_haversine_distance_m(
+                float(pins[i]["lat"]), float(pins[i]["lon"]),
+                float(pins[j]["lat"]), float(pins[j]["lon"])
+            )
+            if dist_m < 5.0:
+                return False, "Two or more location pins are too close together (<5m apart). Please mark distinct corner pins around your field boundary.", {}
 
     raw_coords = [(float(p["lon"]), float(p["lat"])) for p in pins]
 

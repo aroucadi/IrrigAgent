@@ -54,3 +54,39 @@ def test_estimated_data_notice():
     weather = {"et0": 4.5, "precipitation_mm": 0.0, "temp_max_c": 25.0}
     _, msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather, data_quality="estimated")
     assert "Estimated ET₀ data used" in msg
+
+
+def test_extreme_heatwave_warning_appended():
+    """Verify max temp >= 40°C appends heatwave warning section."""
+    weather = {"et0": 6.0, "precipitation_mm": 0.0, "temp_max_c": 41.5, "temp_min_c": 24.0}
+    action, msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather, preferred_language="fr")
+    assert "Alerte Canicule" in msg
+    assert "41.5" in msg
+    assert "1 = Approve" in msg
+
+
+def test_frost_warning_appended():
+    """Verify min temp <= 2°C appends frost warning section."""
+    weather = {"et0": 2.0, "precipitation_mm": 0.0, "temp_max_c": 14.0, "temp_min_c": 1.0}
+    action, msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather, preferred_language="fr")
+    assert "Alerte Gel" in msg
+    assert "1.0" in msg
+    assert "1 = Approve" in msg
+
+
+def test_no_extreme_weather_warning_within_normal_range():
+    """Verify temperatures within normal bounds (2°C - 40°C) do not append extreme warnings."""
+    weather = {"et0": 4.5, "precipitation_mm": 0.0, "temp_max_c": 32.0, "temp_min_c": 16.0}
+    _, msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather)
+    assert "Alerte Canicule" not in msg
+    assert "Alerte Gel" not in msg
+
+
+def test_extreme_weather_and_rainfall_skip_coexistence():
+    """Verify extreme weather warning and rainfall skip logic co-exist in the same message."""
+    weather = {"et0": 3.0, "precipitation_mm": 18.0, "temp_max_c": 42.0, "temp_min_c": 20.0}
+    action, msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather, preferred_language="en")
+    assert action == "skip_rain"
+    assert "SKIP irrigation" in msg
+    assert "Extreme Heat Warning" in msg
+    assert "1 = Approve" in msg

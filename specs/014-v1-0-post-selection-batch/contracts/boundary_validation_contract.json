@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ParcelBoundaryValidationContract",
+  "type": "object",
+  "properties": {
+    "pins": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "number" },
+        "minItems": 2,
+        "maxItems": 2
+      }
+    },
+    "command": { "type": ["string", "null"] }
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "is_valid": { "type": "BOOLEAN" },
+      "error_code": {
+        "type": ["string", "null"],
+        "enum": ["INSUFFICIENT_PINS", "PIN_TOO_CLOSE", "SELF_INTERSECTING", null]
+      },
+      "guidance_message": { "type": "string" },
+      "buffer_reset": { "type": "BOOLEAN" }
+    },
+    "required": ["is_valid", "guidance_message", "buffer_reset"]
+  }
+}

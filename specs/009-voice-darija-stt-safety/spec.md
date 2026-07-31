@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-29
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Feature 2: Section 3.2 — Voice-to-Intent Darija STT (Tier 1 Safety Policy & Confirmation Prompts)"
 

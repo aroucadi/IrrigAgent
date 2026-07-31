@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CropDoctorProductLookupContract",
+  "type": "object",
+  "properties": {
+    "pathogen": { "type": "string" },
+    "crop_type": { "type": "string" },
+    "confidence_level": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] }
+  },
+  "required": ["pathogen", "crop_type", "confidence_level"],
+  "response": {
+    "type": ["object", "null"],
+    "properties": {
+      "trade_name": { "type": "string" },
+      "active_ingredient": { "type": "string" },
+      "authorization_number": { "type": "string" },
+      "source": { "type": "string", "enum": ["dynamic_registry", "static_catalog"] }
+    },
+    "required": ["trade_name", "active_ingredient", "source"]
+  }
+}

@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-28 | **Updated**: 2026-07-28
 
-**Status**: In Refinement (Darija Voice Teaser Extension)
+**Status**: Implemented
 
 **Input**: User prompt: "Extend spec.md to incorporate an opt-in Darija Voice Teaser module using Google Cloud Text-to-Speech (ar-MA) for the WhatsApp IrrigAgent demo while preserving deterministic sub-second text/button execution as the core production path."
 

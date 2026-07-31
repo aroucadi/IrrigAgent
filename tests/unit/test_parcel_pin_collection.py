@@ -1,5 +1,6 @@
 import pytest
 from app.parcel_validation import calculate_shoelace_geodesic_area_ha, validate_parcel_polygon
+from app.regex_parser import is_parcel_cancel_command
 
 
 def test_shoelace_area_calculation():
@@ -43,30 +44,17 @@ def test_polygon_validation_self_intersecting():
     assert "cross each other" in error.lower() or "self-intersecting" in error.lower()
 
 
-def test_polygon_validation_too_small():
-    # Tiny micro-plot (approx 0.001 ha)
+def test_polygon_validation_pins_too_close():
+    # Pins less than 5m apart (~0.00001 deg lat is ~1.1m)
     pins = [
         {"lat": 30.427800, "lon": -9.598100},
-        {"lat": 30.427810, "lon": -9.598100},
-        {"lat": 30.427810, "lon": -9.598110},
-        {"lat": 30.427800, "lon": -9.598110},
+        {"lat": 30.427801, "lon": -9.598100},  # ~1.1m apart
+        {"lat": 30.425000, "lon": -9.595200},
+        {"lat": 30.425100, "lon": -9.598300},
     ]
     is_valid, error, geojson = validate_parcel_polygon(pins)
     assert is_valid is False
-    assert "out of bounds" in error.lower()
-
-
-def test_polygon_validation_too_large():
-    # Huge macro-region (approx 1000 ha)
-    pins = [
-        {"lat": 30.4000, "lon": -9.6000},
-        {"lat": 30.4000, "lon": -9.2000},
-        {"lat": 30.1000, "lon": -9.2000},
-        {"lat": 30.1000, "lon": -9.6000},
-    ]
-    is_valid, error, geojson = validate_parcel_polygon(pins)
-    assert is_valid is False
-    assert "out of bounds" in error.lower()
+    assert "too close together" in error.lower() or "<5m" in error.lower()
 
 
 def test_polygon_validation_fewer_than_3_pins():
@@ -77,3 +65,15 @@ def test_polygon_validation_fewer_than_3_pins():
     is_valid, error, geojson = validate_parcel_polygon(pins)
     assert is_valid is False
     assert "at least 3 corner pins" in error.lower()
+
+
+def test_parcel_restart_command_regex():
+    """Verify multi-lingual restart and reset boundary command triggers (FR-010)."""
+    assert is_parcel_cancel_command("restart boundary") is True
+    assert is_parcel_cancel_command("restart") is True
+    assert is_parcel_cancel_command("recommencer") is True
+    assert is_parcel_cancel_command("réinitialiser") is True
+    assert is_parcel_cancel_command(" بدايات جديدة ") is False  # trailing typo
+    assert is_parcel_cancel_command("بداية جديدة") is True
+    assert is_parcel_cancel_command("/cancel") is True
+    assert is_parcel_cancel_command("random message") is False

@@ -1,6 +1,9 @@
+import numpy as np
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
+from app.sentinel import SentinelSceneMetadata
 
 client = TestClient(app)
 
@@ -102,7 +105,21 @@ def test_whatsapp_location_and_heatmap_full_flow():
             }]
         }]
     }
-    resp_heatmap = client.post("/webhook", json=heatmap_payload)
-    assert resp_heatmap.status_code == 200
-    assert resp_heatmap.json()["status"] == "heatmap_dispatched"
-    assert "media_id" in resp_heatmap.json()
+
+    mock_scene = SentinelSceneMetadata(
+        scene_id="SCENE_MOCK_1",
+        acquisition_date="2026-07-28",
+        cloud_cover_percent=2.5,
+        red_band_url="https://example.com/red.tif",
+        nir_band_url="https://example.com/nir.tif",
+        catalog_source="element84"
+    )
+    mock_red = np.full((100, 100), 0.1, dtype=np.float32)
+    mock_nir = np.full((100, 100), 0.6, dtype=np.float32)
+
+    with patch("app.sentinel.discover_sentinel2_scene", return_value=mock_scene), \
+         patch("app.sentinel.fetch_sentinel2_bands", return_value=(mock_red, mock_nir, "2026-07-28", 2.5)):
+        resp_heatmap = client.post("/webhook", json=heatmap_payload)
+        assert resp_heatmap.status_code == 200
+        assert resp_heatmap.json()["status"] == "heatmap_dispatched"
+        assert "media_id" in resp_heatmap.json()

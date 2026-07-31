@@ -36,7 +36,11 @@ PHASE_2_2B_ACTIVE = os.getenv("PHASE_2_2B_ACTIVE", "false").lower() in ("true", 
 IAV_MILESTONE_THRESHOLD = int(os.getenv("IAV_MILESTONE_THRESHOLD", "500"))
 FAIL_CLOSED_CONFIDENCE_THRESHOLD = float(os.getenv("FAIL_CLOSED_CONFIDENCE_THRESHOLD", "0.75"))
 TEMPERATURE_SCALING_PARAM = float(os.getenv("TEMPERATURE_SCALING_PARAM", "1.25"))
-ONSSA_REGISTRY_PATH = os.getenv("ONSSA_REGISTRY_PATH", os.path.join("data", "onssa_authorized_products.json"))
+# Extreme Weather Advisory Threshold Settings
+HEAT_WARNING_TEMP_C = float(os.getenv("HEAT_WARNING_TEMP_C", "40.0"))
+FROST_WARNING_TEMP_C = float(os.getenv("FROST_WARNING_TEMP_C", "2.0"))
+
+ONSSA_REGISTRY_PATH = os.getenv("ONSSA_REGISTRY_PATH", os.path.join("data", "onssa_registry.json"))
 
 
 

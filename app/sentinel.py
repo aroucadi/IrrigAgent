@@ -136,43 +136,34 @@ def fetch_sentinel2_bands(scene: SentinelSceneMetadata, bbox: list[float]) -> Tu
     
     Returns: (band4_red, band8_nir, capture_date_str, cloud_cover_float)
     """
-    try:
-        import rasterio
-        from rasterio.windows import from_bounds
+    import rasterio
+    from rasterio.windows import from_bounds
 
-        min_lon, min_lat, max_lon, max_lat = bbox
+    min_lon, min_lat, max_lon, max_lat = bbox
 
-        # 1. Read Red Band (B04)
-        with rasterio.open("/vsicurl/" + scene.red_band_url) as src_red:
-            window = from_bounds(min_lon, min_lat, max_lon, max_lat, src_red.transform)
-            red_data = src_red.read(1, window=window).astype(np.float32)
-            if src_red.nodata is not None:
-                red_data[red_data == src_red.nodata] = np.nan
-            red_data = red_data / 10000.0
+    # 1. Read Red Band (B04)
+    with rasterio.open("/vsicurl/" + scene.red_band_url) as src_red:
+        window = from_bounds(min_lon, min_lat, max_lon, max_lat, src_red.transform)
+        red_data = src_red.read(1, window=window).astype(np.float32)
+        if src_red.nodata is not None:
+            red_data[red_data == src_red.nodata] = np.nan
+        red_data = red_data / 10000.0
 
-        # 2. Read NIR Band (B08)
-        with rasterio.open("/vsicurl/" + scene.nir_band_url) as src_nir:
-            window = from_bounds(min_lon, min_lat, max_lon, max_lat, src_nir.transform)
-            nir_data = src_nir.read(1, window=window).astype(np.float32)
-            if src_nir.nodata is not None:
-                nir_data[nir_data == src_nir.nodata] = np.nan
-            nir_data = nir_data / 10000.0
+    # 2. Read NIR Band (B08)
+    with rasterio.open("/vsicurl/" + scene.nir_band_url) as src_nir:
+        window = from_bounds(min_lon, min_lat, max_lon, max_lat, src_nir.transform)
+        nir_data = src_nir.read(1, window=window).astype(np.float32)
+        if src_nir.nodata is not None:
+            nir_data[nir_data == src_nir.nodata] = np.nan
+        nir_data = nir_data / 10000.0
 
-        if red_data.shape != nir_data.shape:
-            target_shape = (max(red_data.shape[0], nir_data.shape[0]), max(red_data.shape[1], nir_data.shape[1]))
-            red_data = np.resize(red_data, target_shape)
-            nir_data = np.resize(nir_data, target_shape)
+    if red_data.shape != nir_data.shape:
+        target_shape = (max(red_data.shape[0], nir_data.shape[0]), max(red_data.shape[1], nir_data.shape[1]))
+        red_data = np.resize(red_data, target_shape)
+        nir_data = np.resize(nir_data, target_shape)
 
-        return red_data, nir_data, scene.acquisition_date, scene.cloud_cover_percent
-    except (ImportError, ModuleNotFoundError):
-        grid_size = 100
-        x = np.linspace(-2, 2, grid_size)
-        y = np.linspace(-2, 2, grid_size)
-        xx, yy = np.meshgrid(x, y)
-        vigor = 0.5 + 0.3 * np.sin(xx) * np.cos(yy)
-        red_data = (0.25 - 0.20 * vigor).astype(np.float32)
-        nir_data = (0.15 + 0.50 * vigor).astype(np.float32)
-        return red_data, nir_data, scene.acquisition_date, scene.cloud_cover_percent
+    return red_data, nir_data, scene.acquisition_date, scene.cloud_cover_percent
+
 
 
 
@@ -316,7 +307,26 @@ def generate_canopy_report(
             no_data_reason=reason
         )
 
-    band4, band8, capture_date, cloud_cover = fetch_sentinel2_bands(scene, bbox)
+    try:
+        band4, band8, capture_date, cloud_cover = fetch_sentinel2_bands(scene, bbox)
+    except Exception as err:
+        reason = f"Satellite band data retrieval failed for scene {scene.scene_id}: {str(err)}"
+        rec = f"Canopy Status: Imagery Unavailable.\nReason: {reason}\nDirect field inspection is recommended."
+        return CanopyHealthReport(
+            parcel_area_ha=area_ha,
+            crop_type=crop_type,
+            capture_date=scene.acquisition_date,
+            cloud_cover_percent=scene.cloud_cover_percent,
+            ndvi_mean=0.0,
+            healthy_percent=0.0,
+            moderate_percent=0.0,
+            stressed_percent=0.0,
+            recommendation=rec,
+            image_bytes=None,
+            is_available=False,
+            no_data_reason=reason
+        )
+
     ndvi_grid = compute_ndvi(band4, band8)
     mask = create_polygon_mask(ndvi_grid.shape, bbox, coords)
 

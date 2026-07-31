@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-29
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Feature 1: Section 3.3 — Sentinel-2 Canopy Heatmaps (Multi-Pin WhatsApp Interaction). Farmers define their field corners by sending standard WhatsApp Location Pins step-by-step. Validation rules: min 3 pins, simple polygon check (no self-intersection), Shoelace area calculation bounded 0.1-200 ha, persist GeoJSON polygon in Firestore. Fetch Copernicus Sentinel-2 L2A imagery (lowest cloud cover past 5 days), compute NDVI, map to high-contrast foliage color palette clipped to parcel boundary with overlays, and deliver via WhatsApp with status and actionable recommendation."
 
