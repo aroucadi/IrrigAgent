@@ -270,3 +270,71 @@ def test_extract_incoming_message_malformed_payload():
     assert extract_incoming_message({}) is None
     assert extract_incoming_message({"entry": []}) is None
     assert extract_incoming_message({"entry": [{"changes": []}]}) is None
+
+
+def test_extract_incoming_message_interactive_button_reply():
+    """Verify extraction of interactive quick reply button postback payload."""
+    payload = {
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "value": {
+                            "messages": [
+                                {
+                                    "from": "212612345678",
+                                    "id": "wamid.button.3003",
+                                    "type": "interactive",
+                                    "interactive": {
+                                        "type": "button_reply",
+                                        "button_reply": {
+                                            "id": "btn_approve",
+                                            "title": "Approve",
+                                        },
+                                    },
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    extracted = extract_incoming_message(payload)
+    assert extracted is not None
+    assert extracted["from"] == "212612345678"
+    assert extracted["type"] == "interactive"
+    assert extracted["button_id"] == "btn_approve"
+    assert extracted["text"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_send_template_message_mock_mode():
+    """Verify send_template_message returns mock payload when WHATSAPP_TOKEN is placeholder."""
+    from app.whatsapp import send_template_message
+    res = await send_template_message("+212600000001", "irrigagent_daily_advisory", "fr", ["Rec text", ""])
+    assert res["messaging_product"] == "whatsapp"
+    assert res["messages"][0]["id"] == "mock_wamid_template_999"
+
+
+@pytest.mark.asyncio
+async def test_send_template_message_success(override_whatsapp_token):
+    """Verify Graph API template payload structure with Quick Reply button components."""
+    from app.whatsapp import send_template_message
+    mock_resp = _mock_httpx_response(200, {"messaging_product": "whatsapp", "messages": [{"id": "wamid.tmpl.555"}]})
+    mock_client = AsyncMock()
+    mock_client.post.return_value = mock_resp
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        res = await send_template_message("+212600000001", "irrigagent_daily_advisory", "fr", ["ETc rec", ""])
+
+    assert res["messages"][0]["id"] == "wamid.tmpl.555"
+    json_payload = mock_client.post.call_args[1]["json"]
+    assert json_payload["type"] == "template"
+    assert json_payload["template"]["name"] == "irrigagent_daily_advisory"
+    assert len(json_payload["template"]["components"]) >= 2
+    assert json_payload["template"]["components"][0]["type"] == "body"
+    assert json_payload["template"]["components"][0]["parameters"][0]["text"] == "ETc rec"
+

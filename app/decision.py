@@ -122,9 +122,8 @@ async def parse_voice_intent(
 
     # Real Vertex AI / Gemini 1.5 Flash Audio ASR Integration
     try:
-        import importlib
-        genai = importlib.import_module("google.genai")
-        types = importlib.import_module("google.genai.types")
+        from google import genai
+        from google.genai import types
 
         client = genai.Client()
         prompt = (
@@ -140,7 +139,14 @@ async def parse_voice_intent(
             contents=[types.Part.from_bytes(data=audio_bytes, mime_type="audio/ogg"), prompt]
         )
         if response and response.text:
-            cleaned = response.text.strip().strip("```json").strip("```")
+            cleaned = response.text.strip()
+            if cleaned.startswith("```"):
+                lines = cleaned.splitlines()
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                cleaned = "\n".join(lines).strip()
             parsed = json.loads(cleaned)
             transcript = str(parsed.get("transcribed_text", ""))
             confidence = float(parsed.get("confidence_score", 0.0))

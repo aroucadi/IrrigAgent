@@ -158,8 +158,15 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "welcomed"}
 
     # 0. Handle WhatsApp Voice Note / Audio Attachment Event
-    if msg_type in ("audio", "voice") or incoming.get("audio_id"):
-        audio_id = incoming.get("audio_id") or "mock_audio_1"
+    if msg_type in ("audio", "voice"):
+        audio_id = incoming.get("audio_id")
+        if not audio_id:
+            import logging
+            logging.error("Missing audio_id in incoming webhook payload for %s: %s", sender, payload)
+            retry_msg = "🎙️ Nous n'avons pas pu lire votre message vocal. Merci de réessayer."
+            await send_text_message(sender, retry_msg)
+            return {"status": "missing_media_id_handled"}
+
         duration = incoming.get("audio_duration", 0)
         audio_bytes = await download_media(audio_id)
         reply_text, allow_tts = await process_voice_note(sender, audio_bytes, duration_seconds=duration)
@@ -274,9 +281,22 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
 
 
     # 3. Handle Leaf Photo Image Event (CropDoctor)
-    if msg_type == "image" or image_id:
+    if msg_type == "image":
+        image_id = incoming.get("image_id")
+        if not image_id:
+            import logging
+            logging.error("Missing image_id in incoming webhook payload for %s: %s", sender, payload)
+            from app.cropdoctor import ONSSA_DISCLAIMER
+            retry_msg = (
+                "🍃 *CropDoctor Advisory*\n"
+                "Nous n'avons pas pu lire votre photo. Merci de renvoyer une photo claire de la feuille.\n\n"
+                f"⚠️ {ONSSA_DISCLAIMER}"
+            )
+            await send_text_message(sender, retry_msg)
+            return {"status": "missing_media_id_handled"}
+
         try:
-            image_bytes = await download_media(image_id or "mock_img_1")
+            image_bytes = await download_media(image_id)
             crop_type = profile.get("crop_type", "tomatoes")
             triage_result = await perform_cropdoctor_triage(image_bytes, crop_type)
             
@@ -284,7 +304,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
             triage_record = {
                 "request_id": f"triage_{sender}_{int(datetime.now(timezone.utc).timestamp())}",
                 "phone_number": sender,
-                "image_id": image_id or "mock_img_1",
+                "image_id": image_id,
                 "pathogen_identified": triage_result["pathogen_identified"],
                 "confidence_score": triage_result["confidence_score"],
                 "confidence_tier": triage_result["confidence_tier"],
@@ -429,20 +449,26 @@ async def trigger_daily_recommendations(
         }
         await save_recommendation(rec_record)
 
-        # 4. Check 24-hour window status to select transport mode (free-form vs. template)
+        # 4. Dispatch WhatsApp daily advisory using template + quick reply buttons
         try:
-            last_ts = await get_inbound_timestamp(phone)
-            if is_user_in_24h_window(last_ts):
-                await send_text_message(phone, rec_msg)
-            else:
-                farm_name = profile.get("farm_name", "Ferme Hassan")
-                et0_val = weather_data.get("et0", 4.5)
-                params = format_advisory_template_params(farm_name=farm_name, et0_val=et0_val, duration_str="45 min")
-                await send_template_message(to=phone, template_name="daily_irrigation_advisory", language_code="fr", parameters=params)
+            params = [rec_msg, "⚠️ Notice: Estimated ET₀ data used due to weather service delay." if data_quality == "estimated" else ""]
+            await send_template_message(
+                to=phone,
+                template_name="irrigagent_daily_advisory",
+                language_code="fr",
+                parameters=params,
+            )
             dispatched_count += 1
             if ENABLE_DARIJA_VOICE_TEASER:
                 background_tasks.add_task(dispatch_darija_voice_teaser, phone, rec_msg)
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.error(
+                "Failed to dispatch daily advisory template to %s: %s (timestamp: %s)",
+                phone,
+                str(e),
+                datetime.now(timezone.utc).isoformat(),
+            )
             failed_count += 1
 
     return DailyAdvisoryJobResponse(

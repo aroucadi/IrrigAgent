@@ -52,8 +52,7 @@ async def test_daily_batch_multi_farm_differentiation():
         patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A, FARM_PROFILE_B])),
         patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
         patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")) as mock_save,
-        patch("app.main.is_user_in_24h_window", return_value=True),
-        patch("app.main.send_text_message", new=AsyncMock(return_value={"status": "sent"})) as mock_send,
+        patch("app.main.send_template_message", new=AsyncMock(return_value={"status": "sent"})) as mock_send,
     ):
         response = client.post(
             "/jobs/daily-recommendations",
@@ -72,9 +71,9 @@ async def test_daily_batch_multi_farm_differentiation():
         assert "+212611111111" in saved_phones
         assert "+212622222222" in saved_phones
 
-        # Verify outbound WhatsApp messages dispatched to both farms
+        # Verify outbound WhatsApp template messages dispatched to both farms
         assert mock_send.call_count == 2
-        sent_phones = [call[0][0] for call in mock_send.call_args_list]
+        sent_phones = [call.kwargs.get("to") or call[0][0] for call in mock_send.call_args_list]
         assert "+212611111111" in sent_phones
         assert "+212622222222" in sent_phones
 
@@ -82,8 +81,8 @@ async def test_daily_batch_multi_farm_differentiation():
 @pytest.mark.asyncio
 async def test_daily_batch_single_farm_failure_resilience():
     """Verify fault isolation: outbound dispatch failure on Farm A does not halt processing or dispatch for Farm B."""
-    async def mock_send_message_side_effect(phone, text):
-        if phone == "+212611111111":
+    async def mock_send_message_side_effect(to, **kwargs):
+        if to == "+212611111111":
             raise RuntimeError("Graph API simulated connection error for Farm A")
         return {"status": "sent"}
 
@@ -91,8 +90,7 @@ async def test_daily_batch_single_farm_failure_resilience():
         patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A, FARM_PROFILE_B])),
         patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
         patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")) as mock_save,
-        patch("app.main.is_user_in_24h_window", return_value=True),
-        patch("app.main.send_text_message", new=AsyncMock(side_effect=mock_send_message_side_effect)) as mock_send,
+        patch("app.main.send_template_message", new=AsyncMock(side_effect=mock_send_message_side_effect)) as mock_send,
     ):
         response = client.post(
             "/jobs/daily-recommendations",
@@ -119,8 +117,7 @@ async def test_daily_batch_all_farms_failure_resilience():
         patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A, FARM_PROFILE_B])),
         patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
         patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")),
-        patch("app.main.is_user_in_24h_window", return_value=True),
-        patch("app.main.send_text_message", new=AsyncMock(side_effect=RuntimeError("Global network outage"))),
+        patch("app.main.send_template_message", new=AsyncMock(side_effect=RuntimeError("Global network outage"))),
     ):
         response = client.post(
             "/jobs/daily-recommendations",
@@ -136,12 +133,11 @@ async def test_daily_batch_all_farms_failure_resilience():
 
 @pytest.mark.asyncio
 async def test_daily_batch_template_message_when_window_closed():
-    """Verify daily batch job uses send_template_message when 24h window is closed."""
+    """Verify daily batch job uses send_template_message for advisory dispatch."""
     with (
         patch("app.main.list_active_farm_profiles", new=AsyncMock(return_value=[FARM_PROFILE_A])),
         patch("app.main.get_et0_forecast", new=AsyncMock(return_value=(MOCK_WEATHER_DATA, "fresh"))),
         patch("app.main.save_recommendation", new=AsyncMock(return_value="rec_123")),
-        patch("app.main.is_user_in_24h_window", return_value=False),
         patch("app.main.send_template_message", new=AsyncMock(return_value={"status": "sent"})) as mock_send_template,
     ):
         response = client.post(

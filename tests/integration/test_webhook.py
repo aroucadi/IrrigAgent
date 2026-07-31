@@ -231,3 +231,56 @@ def test_daily_advisory_alias_endpoint():
             assert "skipped_count" in data
     asyncio.run(_test())
 
+
+def test_webhook_missing_media_id_image():
+    """Verify that an image event with a missing media ID is handled cleanly with a retry message (US5 / CRIT-007)."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = {
+                "object": "whatsapp_business_account",
+                "entry": [{
+                    "changes": [{
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "messages": [{
+                                "from": "+212600000000",
+                                "id": "wamid_test_img_no_id",
+                                "type": "image",
+                                "image": {}  # Missing "id"
+                            }]
+                        }
+                    }]
+                }]
+            }
+            resp = await client.post("/webhook", json=payload)
+            assert resp.status_code == 200
+            assert resp.json().get("status") == "missing_media_id_handled"
+    asyncio.run(_test())
+
+
+def test_webhook_missing_media_id_audio():
+    """Verify that an audio event with a missing media ID is handled cleanly with a retry message (US5 / CRIT-007)."""
+    async def _test():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            payload = {
+                "object": "whatsapp_business_account",
+                "entry": [{
+                    "changes": [{
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "messages": [{
+                                "from": "+212600000000",
+                                "id": "wamid_test_audio_no_id",
+                                "type": "audio",
+                                "audio": {}  # Missing "id"
+                            }]
+                        }
+                    }]
+                }]
+            }
+            resp = await client.post("/webhook", json=payload)
+            assert resp.status_code == 200
+            assert resp.json().get("status") == "missing_media_id_handled"
+    asyncio.run(_test())
+
+

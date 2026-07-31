@@ -149,18 +149,14 @@ def fetch_sentinel2_bands(scene: SentinelSceneMetadata, bbox: list[float]) -> Tu
             red_data[red_data == src_red.nodata] = np.nan
         red_data = red_data / 10000.0
 
-    # 2. Read NIR Band (B08)
+    # 2. Read NIR Band (B08) - pass out_shape matching Red band to prevent bounding box 1-pixel rounding mismatch
     with rasterio.open("/vsicurl/" + scene.nir_band_url) as src_nir:
         window = from_bounds(min_lon, min_lat, max_lon, max_lat, src_nir.transform)
-        nir_data = src_nir.read(1, window=window).astype(np.float32)
+        target_out_shape = (red_data.shape[0], red_data.shape[1])
+        nir_data = src_nir.read(1, window=window, out_shape=target_out_shape).astype(np.float32)
         if src_nir.nodata is not None:
             nir_data[nir_data == src_nir.nodata] = np.nan
         nir_data = nir_data / 10000.0
-
-    if red_data.shape != nir_data.shape:
-        target_shape = (max(red_data.shape[0], nir_data.shape[0]), max(red_data.shape[1], nir_data.shape[1]))
-        red_data = np.resize(red_data, target_shape)
-        nir_data = np.resize(nir_data, target_shape)
 
     return red_data, nir_data, scene.acquisition_date, scene.cloud_cover_percent
 

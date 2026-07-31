@@ -59,7 +59,7 @@ async def download_media(media_id: str) -> bytes:
 
 
 def extract_incoming_message(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Extract sender number, text body, image ID, or location attachment from Meta webhook POST payload."""
+    """Extract sender number, text body, image ID, location attachment, or interactive button reply from Meta webhook POST payload."""
     try:
         entry = payload["entry"][0]
         change = entry["changes"][0]["value"]
@@ -72,6 +72,32 @@ def extract_incoming_message(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
 
         sender = msg.get("from")
         text_body = msg.get("text", {}).get("body") if msg_type == "text" else None
+        
+        # Parse interactive or quick-reply button postbacks
+        button_id = None
+        button_title = None
+        if msg_type == "interactive":
+            interactive = msg.get("interactive", {})
+            if interactive.get("type") == "button_reply":
+                btn_reply = interactive.get("button_reply", {})
+                button_id = btn_reply.get("id")
+                button_title = btn_reply.get("title")
+        elif msg_type == "button":
+            btn = msg.get("button", {})
+            button_id = btn.get("payload") or btn.get("text")
+            button_title = btn.get("text")
+
+        if button_id:
+            button_map = {
+                "btn_approve": "1",
+                "btn_confirm": "1",
+                "btn_skip": "2",
+                "btn_cancel": "2",
+                "btn_modify": "3",
+                "btn_discard": "3",
+            }
+            text_body = button_map.get(button_id, button_id)
+
         image_id = msg.get("image", {}).get("id") if msg_type == "image" else None
         location_data = msg.get("location") if msg_type == "location" else None
         audio_obj = msg.get("audio") or msg.get("voice") or {}
@@ -82,6 +108,8 @@ def extract_incoming_message(payload: Dict[str, Any]) -> Optional[Dict[str, Any]
             "from": sender,
             "type": msg_type,
             "text": text_body,
+            "button_id": button_id,
+            "button_title": button_title,
             "image_id": image_id,
             "audio_id": audio_id,
             "audio_duration": audio_duration,
@@ -184,11 +212,12 @@ def is_user_in_24h_window(last_inbound_timestamp: Optional[Union[datetime, str]]
 
 async def send_template_message(
     to: str,
-    template_name: str = "daily_irrigation_advisory",
+    template_name: str = "irrigagent_daily_advisory",
     language_code: str = "fr",
     parameters: Optional[List[str]] = None,
+    components: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Send a pre-approved WhatsApp Message Template via Meta Cloud API."""
+    """Send a pre-approved Meta WhatsApp Cloud API Message Template with Quick Reply buttons."""
     if _is_mock_token(WHATSAPP_TOKEN):
         return {"messaging_product": "whatsapp", "contacts": [{"wa_id": to}], "messages": [{"id": "mock_wamid_template_999"}]}
 
@@ -197,10 +226,18 @@ async def send_template_message(
         "Content-Type": "application/json",
     }
     
-    components = []
-    if parameters:
-        body_params = [{"type": "text", "text": str(p)} for p in parameters]
-        components.append({"type": "body", "parameters": body_params})
+    if components is None:
+        components = []
+        if parameters:
+            body_params = [{"type": "text", "text": str(p)} for p in parameters]
+            components.append({"type": "body", "parameters": body_params})
+
+        if template_name in ("irrigagent_daily_advisory", "daily_irrigation_advisory"):
+            components.extend([
+                {"type": "button", "sub_type": "quick_reply", "index": "0", "parameters": [{"type": "payload", "payload": "btn_approve"}]},
+                {"type": "button", "sub_type": "quick_reply", "index": "1", "parameters": [{"type": "payload", "payload": "btn_skip"}]},
+                {"type": "button", "sub_type": "quick_reply", "index": "2", "parameters": [{"type": "payload", "payload": "btn_modify"}]},
+            ])
 
     payload = {
         "messaging_product": "whatsapp",
