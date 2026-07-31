@@ -37,9 +37,15 @@ Developed for the **StartGate Agri-Food Tech Incubator** (5th Cohort, UM6P × IA
 - **Darija Audio Synthesis**: Optional voice note output (`ENABLE_DARIJA_VOICE_TEASER=true`) using Google Cloud Text-to-Speech (`ar-MA` Moroccan Arabic) sequenced asynchronously after sub-second text responses.
 - **WhatsApp Audio Delivery**: Transmits native OGG/OPUS audio messages via Meta Graph API media upload endpoint.
 
+### 📊 Internal Engagement & Traction Dashboard (Sales Evidence Tool)
+- **Standalone Read-Only Report Generator**: Founder-facing CLI tool (`scripts/generate_engagement_report.py`) querying existing Firestore collections (`farm_profiles`, `irrigation_recommendations`, `disease_triage_requests`) with zero database writes and zero changes to production farmer-facing app code.
+- **Small-Sample Directional Data Governance**: Automatically tags output metrics and charts with `⚠️ [Early / Directional Data (Sample Size < 5 Active Farms)]` whenever sample size is below threshold to preserve enterprise sales credibility.
+- **Multi-Format Export**: Generates static high-resolution PNG chart figures (`matplotlib`) and standalone static HTML pages for discovery call screen-sharing and post-meeting leave-behinds.
+
 ### 🛡️ Quality & Security Gate Module
 - **Automated Pre-Commit Hooks**: 3-stage local verification gate enforcing Secret Scanning (Meta tokens, GCP keys, Firestore credentials), Code Linting & Formatting (`ruff`, `black`), and Fast Unit Tests (`pytest tests/` with 100% pass rate under 3 seconds).
 - **Cross-Platform Scripting**: Dual POSIX shell (`.sh`) and Windows PowerShell (`.ps1`) scripts for 1-command developer setup and execution.
+
 
 ---
 
@@ -110,6 +116,14 @@ This project is built following GitHub's [spec-kit](https://github.com/github/sp
 - **Tasks (Completed)**: [specs/005-onssa-registry-sync/tasks.md](specs/005-onssa-registry-sync/tasks.md)
 - **Research & Decisions**: [specs/005-onssa-registry-sync/research.md](specs/005-onssa-registry-sync/research.md)
 - **Quickstart & Verification**: [specs/005-onssa-registry-sync/quickstart.md](specs/005-onssa-registry-sync/quickstart.md)
+
+#### Feature 018: Internal Engagement & Traction Dashboard (`018-internal-traction-dashboard`)
+- **Specification**: [specs/018-internal-traction-dashboard/spec.md](specs/018-internal-traction-dashboard/spec.md)
+- **Implementation Plan**: [specs/018-internal-traction-dashboard/plan.md](specs/018-internal-traction-dashboard/plan.md)
+- **Tasks (Completed)**: [specs/018-internal-traction-dashboard/tasks.md](specs/018-internal-traction-dashboard/tasks.md)
+- **Research & Decisions**: [specs/018-internal-traction-dashboard/research.md](specs/018-internal-traction-dashboard/research.md)
+- **Quickstart & Verification**: [specs/018-internal-traction-dashboard/quickstart.md](specs/018-internal-traction-dashboard/quickstart.md)
+
 
 
 ---
