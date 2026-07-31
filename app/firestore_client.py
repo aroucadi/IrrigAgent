@@ -22,8 +22,10 @@ _IN_MEMORY_PIN_SESSIONS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_FARM_PARCELS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_PENDING_INTENTS: Dict[str, Dict[str, Any]] = {}
 _IN_MEMORY_INBOUND_TIMESTAMPS: Dict[str, str] = {}
+_IN_MEMORY_SENSOR_READINGS: Dict[str, Dict[str, Any]] = {}
 
 _db_client = None
+
 
 def get_firestore_client():
     global _db_client
@@ -484,5 +486,47 @@ async def get_inbound_timestamp(phone_number: str) -> Optional[str]:
     if phone_number in _IN_MEMORY_FARM_PROFILES:
         return _IN_MEMORY_FARM_PROFILES[phone_number].get("last_inbound_timestamp")
     return None
+
+
+async def update_farm_sensor_state(telemetry_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Persist latest valid soil sensor telemetry reading for a farm profile."""
+    from app.schemas import SensorTelemetryPayload
+    validated = SensorTelemetryPayload.model_validate(telemetry_data)
+    clean_data = validated.model_dump()
+    phone_number = clean_data["farm_id"]
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_profiles").document(phone_number)
+            await doc_ref.set({"sensor_state": clean_data}, merge=True)
+        except Exception:
+            pass
+            
+    _IN_MEMORY_SENSOR_READINGS[phone_number] = clean_data
+    if phone_number in _IN_MEMORY_FARM_PROFILES:
+        _IN_MEMORY_FARM_PROFILES[phone_number]["sensor_state"] = clean_data
+    return clean_data
+
+
+async def get_farm_sensor_state(phone_number: str) -> Optional[Dict[str, Any]]:
+    """Retrieve latest soil sensor telemetry reading for a farm profile."""
+    client = get_firestore_client()
+    if client:
+        try:
+            doc_ref = client.collection("farm_profiles").document(phone_number)
+            doc = await doc_ref.get()
+            if doc.exists:
+                data = doc.to_dict()
+                if "sensor_state" in data:
+                    return data["sensor_state"]
+        except Exception:
+            pass
+            
+    if phone_number in _IN_MEMORY_SENSOR_READINGS:
+        return _IN_MEMORY_SENSOR_READINGS[phone_number]
+    if phone_number in _IN_MEMORY_FARM_PROFILES:
+        return _IN_MEMORY_FARM_PROFILES[phone_number].get("sensor_state")
+    return None
+
 
 

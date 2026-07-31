@@ -90,3 +90,34 @@ def test_extreme_weather_and_rainfall_skip_coexistence():
     assert "SKIP irrigation" in msg
     assert "Extreme Heat Warning" in msg
     assert "1 = Approve" in msg
+
+
+def test_sensor_fusion_depleted_soil_adds_badge():
+    from datetime import datetime, timezone
+    sensor_state = {
+        "farm_id": "+212600000000",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "soil_moisture_vwc": 16.5,
+        "depth_cm": 15,
+        "battery_level": 90
+    }
+    weather = {"et0": 4.0, "precipitation_mm": 0.0, "temp_max_c": 26.0}
+    action, msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather, sensor_state=sensor_state, preferred_language="fr")
+    assert action == "adjust_water"
+    assert "Données Capteur Sol" in msg
+    assert "16.5%" in msg
+    assert "Épuisement détecté" in msg
+
+
+def test_sensor_fusion_stale_telemetry_fallback():
+    sensor_state = {
+        "farm_id": "+212600000000",
+        "timestamp": "2020-01-01T00:00:00Z",  # Stale timestamp
+        "soil_moisture_vwc": 12.0,
+        "depth_cm": 15
+    }
+    weather = {"et0": 4.0, "precipitation_mm": 0.0, "temp_max_c": 26.0}
+    action, msg = evaluate_irrigation_recommendation("tomatoes", 10.0, weather, sensor_state=sensor_state, preferred_language="fr")
+    assert "Capteur Sol" not in msg  # Stale telemetry falls back to pure weather math
+    assert action == "approve_standard"
+

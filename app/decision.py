@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional, List
 from app.fao56 import calculate_crop_etc
 from app.config import HEAT_WARNING_TEMP_C, FROST_WARNING_TEMP_C
@@ -12,6 +13,81 @@ except ImportError:
     types = None
 
 
+def evaluate_sensor_fusion_calibration(
+    sensor_state: Optional[Dict[str, Any]],
+    preferred_language: str = "fr",
+    current_utc_iso: Optional[str] = None
+) -> Tuple[int, Optional[str], bool]:
+    """
+    Evaluates soil moisture sensor telemetry state and returns (sensor_delta_minutes, sensor_badge_text, is_fused).
+    - Telemetry must exist and timestamp must be fresh (< 24 hours old).
+    - If VWC < 18.0%: Soil depleted -> add +15 min calibration delta.
+    - If VWC > 28.0%: Near field capacity -> subtract -15 min calibration delta.
+    - Otherwise (18.0% <= VWC <= 28.0%): Soil optimal -> 0 min calibration delta.
+    - Returns badge text e.g. "📡 Données Capteur Sol (15cm): Humidité mesurée à 16.5%."
+    - If stale (> 24h) or missing -> returns (0, None, False) for pure weather fallback.
+    """
+    if not sensor_state or not isinstance(sensor_state, dict):
+        return 0, None, False
+
+    timestamp_str = sensor_state.get("timestamp")
+    vwc = sensor_state.get("soil_moisture_vwc")
+    depth_cm = sensor_state.get("depth_cm", 15)
+
+    if vwc is None or timestamp_str is None:
+        return 0, None, False
+
+    try:
+        ts_clean = str(timestamp_str).replace("Z", "+00:00")
+        reading_dt = datetime.fromisoformat(ts_clean)
+        if reading_dt.tzinfo is None:
+            reading_dt = reading_dt.replace(tzinfo=timezone.utc)
+
+        now_dt = datetime.fromisoformat(current_utc_iso.replace("Z", "+00:00")) if current_utc_iso else datetime.now(timezone.utc)
+        if now_dt.tzinfo is None:
+            now_dt = now_dt.replace(tzinfo=timezone.utc)
+
+        age_seconds = (now_dt - reading_dt).total_seconds()
+        if age_seconds < 0 or age_seconds > 86400:  # Stale if > 24 hours (86400s)
+            return 0, None, False
+    except Exception:
+        return 0, None, False
+
+    vwc_val = float(vwc)
+    if preferred_language == "ar":
+        badge_text = f"📡 *بيانات مستشعر التربة* ({depth_cm}سم): الرطوبة المقاسة {vwc_val:.1f}%."
+    elif preferred_language == "en":
+        badge_text = f"📡 *Soil Sensor Ground-Truth* ({depth_cm}cm): Moisture measured at {vwc_val:.1f}%."
+    else:
+        badge_text = f"📡 *Données Capteur Sol* ({depth_cm}cm): Humidité mesurée à {vwc_val:.1f}%."
+
+    if vwc_val < 18.0:
+        delta_minutes = 15
+        if preferred_language == "ar":
+            badge_text += " (استنزاف التربة → تعديل +15 دقيقة)."
+        elif preferred_language == "en":
+            badge_text += " (Soil depletion detected → +15 min adjustment)."
+        else:
+            badge_text += " (Épuisement détecté → ajustement +15 min)."
+    elif vwc_val > 28.0:
+        delta_minutes = -15
+        if preferred_language == "ar":
+            badge_text += " (تربة مشبعة → تقليل -15 دقيقة)."
+        elif preferred_language == "en":
+            badge_text += " (Near field capacity → -15 min reduction)."
+        else:
+            badge_text += " (Proche de la capacité au champ → réduction -15 min)."
+    else:
+        delta_minutes = 0
+        if preferred_language == "ar":
+            badge_text += " (رطوبة مثالية)."
+        elif preferred_language == "en":
+            badge_text += " (Optimal moisture level)."
+        else:
+            badge_text += " (Niveau d'humidité optimal)."
+
+    return delta_minutes, badge_text, True
+
 
 def evaluate_irrigation_recommendation(
     crop_type: str,
@@ -20,9 +96,10 @@ def evaluate_irrigation_recommendation(
     planting_date: Optional[str] = None,
     is_mature_orchard: bool = False,
     data_quality: str = "fresh",
-    preferred_language: str = "fr"
+    preferred_language: str = "fr",
+    sensor_state: Optional[Dict[str, Any]] = None
 ) -> Tuple[str, str]:
-    """Evaluate weather metrics and crop-specific ETc to return (recommended_action, recommendation_text_message)."""
+    """Evaluate weather metrics, crop ETc, and ground-truth soil sensor state to return (action, text_message)."""
     et0 = weather_data.get("et0", 4.5)
     precip = weather_data.get("precipitation_mm", 0.0)
 
@@ -35,10 +112,12 @@ def evaluate_irrigation_recommendation(
     etc = etc_res.etc_mm
     kc = etc_res.kc_applied
 
+    sensor_delta_min, sensor_badge, is_sensor_fused = evaluate_sensor_fusion_calibration(sensor_state, preferred_language)
+
     if precip >= 15.0:
         action = "skip_rain"
         base_msg = f"Heavy rainfall expected ({precip} mm). Recommendation: SKIP irrigation tomorrow."
-    elif etc >= 5.5:
+    elif etc >= 5.5 or (is_sensor_fused and sensor_delta_min > 0):
         action = "adjust_water"
         base_msg = f"High crop water demand expected ({etc} mm ETc [ET₀ {et0} × Kc {kc}]). Recommendation: Increase irrigation duration by +15 min tomorrow morning."
     else:
@@ -88,6 +167,10 @@ def evaluate_irrigation_recommendation(
         "🌾 *IrrigAgent Advisory for Tomorrow*",
         base_msg,
     ]
+
+    if is_sensor_fused and sensor_badge:
+        msg_lines.append(sensor_badge)
+
 
     if extreme_warning_lines:
         msg_lines.append("")

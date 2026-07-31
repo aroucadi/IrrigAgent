@@ -52,6 +52,8 @@ from app.firestore_client import (
     get_inbound_timestamp,
     update_farm_profile_opt_out,
     save_outcome_feedback,
+    update_farm_sensor_state,
+    get_farm_sensor_state,
 )
 
 
@@ -64,15 +66,30 @@ from app.schemas import (
     PinCollectionSession,
     ParcelBoundary,
     CanopyHealthReport,
+    SensorTelemetryPayload,
 )
 
 app = FastAPI(title="IrrigAgent AI", version="1.0.0")
+
+
+@app.post("/telemetry/sensor")
+async def receive_sensor_telemetry(payload: SensorTelemetryPayload):
+    """Ingests, validates, and persists live IoT soil moisture probe telemetry."""
+    await update_farm_sensor_state(payload.model_dump())
+    return {
+        "status": "success",
+        "farm_id": payload.farm_id,
+        "soil_moisture_vwc": payload.soil_moisture_vwc,
+        "timestamp": payload.timestamp,
+        "message": "Telemetry recorded. Sensor state active.",
+    }
 
 
 @app.post("/cropdoctor/prefilter", response_model=QualityCheckResult)
 async def prefilter_image_endpoint(file: UploadFile = File(...)):
     """Standalone endpoint for pre-filtering crop leaf image quality using OpenCV heuristics."""
     image_bytes = await file.read()
+
     return validate_image_quality(image_bytes)
 
 
@@ -551,12 +568,23 @@ async def trigger_daily_recommendations(
         weather_data, data_quality = await get_et0_forecast(loc["latitude"], loc["longitude"])
         quality_summary[data_quality] += 1
 
+        # Retrieve farm sensor state if present
+        sensor_state = await get_farm_sensor_state(phone)
+
         # 2. Evaluate recommendation logic
         action, rec_msg = evaluate_irrigation_recommendation(
-            crop, acreage, weather_data, planting_date=planting_date, is_mature_orchard=is_mature_orchard, data_quality=data_quality
+            crop,
+            acreage,
+            weather_data,
+            planting_date=planting_date,
+            is_mature_orchard=is_mature_orchard,
+            data_quality=data_quality,
+            preferred_language=profile.get("preferred_language", "fr"),
+            sensor_state=sensor_state,
         )
 
         if profile.get("onboarding_incomplete"):
+
             rec_msg += "\n\n⚠️ Setup incomplete: Reply setup to complete location & crop configuration."
 
         # 3. Store recommendation record

@@ -218,3 +218,12 @@ class PendingVoiceIntentPayload(BaseModel):
 class PendingVoiceIntentDoc(BaseModel):
     pending_voice_intent: PendingVoiceIntentPayload
 
+
+class SensorTelemetryPayload(BaseModel):
+    farm_id: str = Field(description="Farm phone number or unique identifier")
+    timestamp: str = Field(description="ISO 8601 timestamp of probe measurement")
+    soil_moisture_vwc: float = Field(ge=0.0, le=100.0, description="Volumetric Water Content percentage (VWC %)")
+    depth_cm: int = Field(default=15, ge=1, le=200, description="Sensor probe depth in centimeters")
+    battery_level: int = Field(default=100, ge=0, le=100, description="Sensor battery remaining percentage")
+
+
