@@ -1,3 +1,5 @@
+# SUPERSEDED — this log was generated using mocked API responses (see mock_wamid identifiers and 'Simulated Inbound Timestamp' entries throughout) and does not reflect real verification. See specs/020-anti-fabrication-verification-tooling for the replacement process.
+
 # Production Readiness Verification Log
 
 **Feature**: Pre-Conversation Production Readiness Verification (`019-production-readiness-verification`)
